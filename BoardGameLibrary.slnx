@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="BoardGameLibrary.Api/BoardGameLibrary.Api.csproj" />
+  <Project Path="BoardGameLibrary.Tests/BoardGameLibrary.Tests.csproj" />
+</Solution>
