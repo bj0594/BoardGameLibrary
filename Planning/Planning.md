@@ -874,3 +874,117 @@ Do not add architecture or optional features merely because they are available.
 - Todoist → work status and task completion when Todoist is used.
 
 A completed task does not replace current project truth.
+
+## BGG data contract
+
+Define the smallest BGG dataset that is sufficient for the chosen project direction.
+
+The purpose is to decide what the application actually depends on before designing the database or implementation.
+
+### Import scope
+
+The application will import board-game data from BoardGameGeek.
+
+Store only data that supports one or more of these purposes:
+
+- identifying the game
+- displaying useful game information
+- describing general BGG popularity/rating
+- describing suitability for different player counts
+- supporting meaningful API queries and filtering
+
+Do not mirror the BGG API. Data is included because the application needs it, not because BGG exposes it.
+
+### Board game data
+
+- **BGG ID** — external identifier used to identify the game in BGG.
+- **Name** — game title.
+- **Year Published** — publication year, where available.
+- **Min Players** — minimum supported player count.
+- **Max Players** — maximum supported player count.
+- **Playing Time** — BGG's reported playing-time value.
+- **Min Playing Time** — minimum reported playing time.
+- **Max Playing Time** — maximum reported playing time.
+- **Min Age** — BGG's reported minimum age.
+- **Average Rating** — general BGG user rating.
+- **Users Rated** — number of BGG users contributing to the rating.
+- **Bayes Average** — BGG's Bayesian average.
+- **Average Weight** — BGG's reported complexity/weight rating.
+- **BGG Rank** — BGG's ranking value, where available.
+- **Best With** — BGG's summarized recommended player-count information.
+- **Recommended With** — BGG's summarized recommended player-count information.
+
+### Player-count recommendations
+
+Player-count suitability is represented separately from the general board-game data.
+
+For each player-count category returned by BGG, store:
+
+- **Player Count**
+- **Best Votes**
+- **Recommended Votes**
+- **Not Recommended Votes**
+
+The representation must support the player-count categories actually returned by BGG, including categories such as `4+` where applicable.
+
+Do not convert these values into a fabricated "solo rating", "two-player rating", or similar score.
+
+The raw vote categories should remain distinguishable so that the application can later derive its own queries or presentation from the underlying data.
+
+### Important distinctions
+
+**General BGG rating is not a player-count rating.**
+
+`Average Rating` describes the game's overall BGG rating and must not be presented as evidence that the game is good for a particular player count.
+
+**BGG rank is not the same as rating.**
+
+`BGG Rank` is contextual ranking information and is not required to determine player-count suitability.
+
+**Min Players / Max Players are not suitability scores.**
+
+They describe the supported player-count range, but do not indicate how well the game works at each player count.
+
+**Best With / Recommended With are summaries.**
+
+The player-count vote data provides more detail about the underlying distribution of recommendations and should remain available independently of the summary fields.
+
+### Explicitly out of scope
+
+Do not import or model BGG data merely because it exists.
+
+The initial implementation does not require:
+
+- designers
+- artists
+- publishers
+- mechanics
+- categories
+- expansions
+- forums
+- comments
+- marketplace data
+- videos
+- images
+- user collections
+- historical rating data
+
+Additional BGG data may be introduced later only when a concrete application requirement justifies it.
+
+### Data ownership
+
+BGG remains the external source of imported game information.
+
+The BoardGame Library API owns its local representation of that information.
+
+Imported BGG data should therefore be treated as external-source data rather than as an uncontrolled mirror of BGG.
+
+### Contract questions
+
+Before implementation, confirm:
+
+- Which BGG fields are actually available from the selected API response?
+- Which fields are optional or can be missing?
+- What exact representation does BGG use for player-count categories?
+- How should missing BGG values be represented in the local database?
+- Which BGG values should be refreshed when an existing game is imported again?
