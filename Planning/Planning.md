@@ -19,7 +19,7 @@
 
 - **Problem / need:**
 
-  BoardGameGeek provides useful board-game metadata and player-count information, but information relevant to solo play is not presented as a dedicated, locally manageable discovery workflow. The project will combine relevant external data with a local collection so that owned games can be queried and filtered according to information useful for solo discovery.
+  BoardGameGeek provides useful board-game metadata and player-count information, but information relevant to solo play is not presented as a dedicated, locally manageable discovery workflow. The project will combine relevant external data with a local collection so that stored games can be queried and filtered according to information useful for solo discovery.
 
 - **User / recipient:**
 
@@ -66,7 +66,6 @@
 
 - **Initial unknowns:**
 
-  - The exact final representation of BGG player-count buckets such as `4+` in the local model.
   - Which filtering/sorting features should be exposed beyond the core `players` query.
   - The concrete validation rules for POST input.
   - The exact error response strategy for external BGG and database failures.
@@ -82,7 +81,7 @@ I need to build a small REST API around a meaningful domain model. The API must 
 
 The selected direction extends the basic assignment with a real use case: a local board-game library enriched with relevant BoardGameGeek information. SQL persistence and Entity Framework Core are deliberately selected because the project benefits from persistent local data and database querying. External HTTP access provides a meaningful asynchronous I/O boundary.
 
-The assignment's optional service layer, advanced GET features, and xUnit project remain separate choices and should only be added where they provide a concrete benefit.
+The assignment's optional service layer and advanced GET features remain separate choices and should only be added where they provide a concrete benefit. xUnit is a fixed project-workflow decision for this project.
 
 ## Existing project, if any
 
@@ -251,28 +250,29 @@ Record requirements from the assignment, approved clarifications, or project dec
 
 ## Selected optional requirements
 
-- **R17 — SQL persistence** · Technical · MUST · Assignment – Optional SQL support + project decision  
-  The project will use SQL persistence for the local board-game library.
+- **R17 — SQLite persistence** · Technical · MUST · Assignment – Optional SQL support + project decision  
+  The project will use a local SQLite database for the board-game library.
 
 - **R18 — Entity Framework Core** · Technical · MUST · Assignment – Optional SQL support + project decision  
-  Entity Framework Core will be used as the selected data-access framework for the SQL database.
+  Entity Framework Core will be used as the selected data-access framework for SQLite.
 
 - **R19 — Async database access** · Technical · MUST · Assignment – Optional SQL support + project decision  
   Database access shall remain asynchronous and non-blocking.
 
 - **R20 — SQL documentation** · Delivery · MUST · Assignment – Optional SQL support + project decision  
-  The README shall document the relevant local database setup and run steps.
+  The README shall document the relevant local SQLite database setup and run steps.
+
+- **R22 — Player-count GET filtering** · Functional · MUST · Assignment – Optional paging/filtering + project decision  
+  The collection GET endpoint shall support filtering by the requested BGG player-count recommendation category through the `players` query parameter.
+
+- **R23 — Automated API tests** · Verification · MUST · Assignment – Optional xUnit project + project decision  
+  This project will include a separate xUnit test project for automated API verification.
 
 ## Remaining optional requirements
 
 - **R21 — Service layer** · Design · MAY · Assignment – Optional service layer  
   A service layer may be used if a concrete responsibility justifies it.
 
-- **R22 — GET extensions** · Functional · MAY · Assignment – Optional paging/filtering  
-  Filtering, sorting, and/or pagination may be added when meaningful for the selected resource.
-
-- **R23 — Automated API tests** · Verification · MUST · Assignment – Optional xUnit project + project decision  
-  This project will include a separate xUnit test project for automated API verification.
 
 > Use `MUST / SHOULD / MAY` only when the source or an explicit project decision establishes that strength.
 
@@ -292,10 +292,6 @@ For important requirements:
 # 4. CLARIFICATIONS / ASSUMPTIONS / OPEN QUESTIONS
 
 Use this section only for genuinely unresolved project questions.
-
-- **A1 — Player-count bucket representation** · Open question  
-  The BGG source can contain values such as `4+`; the local representation must preserve the meaning without reducing it to a misleading fixed integer.  
-  **Why it matters:** Affects the concrete C#/SQL representation of player-count recommendations.
 
 - **A2 — GET extensions** · Open question  
   The core `players` query has been selected, but additional filtering/sorting should only be added if it provides useful behaviour.  
@@ -370,7 +366,7 @@ The project will not attempt to reproduce the full BoardGameGeek data model or b
 - Retrieval of relevant BGG information.
 - Local persistence of the selected BGG-derived data.
 - Relevant solo/player-count information.
-- Meaningful GET filtering and/or sorting where justified.
+- Player-count filtering through the collection GET endpoint.
 - Appropriate HTTP responses and error handling.
 - Asynchronous external HTTP handling.
 - Asynchronous database access.
@@ -390,7 +386,6 @@ Initially:
 - Redis or other additional infrastructure.
 - Service/repository layers without a concrete responsibility.
 - Advanced pagination or query features without a concrete need.
-- xUnit testing unless deliberately selected.
 
 Optional work must not displace completion of the core API.
 
@@ -473,7 +468,7 @@ Add further behaviours only when a concrete project requirement or selected exte
 
 - **Requirement(s):** R1, R3, R4, R6, R7, R8, R9, R10, R13, R17, R18, R19.
 - **Acceptance criterion:** A valid request creates a local board-game resource using the required external BGG information and returns the appropriate creation response.
-- **Precondition / input:** A valid request containing the required game identifier and any required personal/library information.
+- **Precondition / input:** A valid request containing the required BGG game identifier.
 - **Action:** Submit the POST request and perform the required external and database operations.
 - **Expected result:** The relevant external data is transformed into the local model, the resource is persisted, and the API returns the appropriate successful HTTP response.
 - **Observation boundary:** HTTP response and persisted database state.
@@ -491,7 +486,7 @@ Add further behaviours only when a concrete project requirement or selected exte
 
 ## B03 — Discover games by player count
 
-- **Requirement(s):** R2, R10, and R22 if GET extensions are retained.
+- **Requirement(s):** R2, R10, R22.
 - **Acceptance criterion:** A valid `players` query returns games that have BoardGameGeek community recommendation data for the requested player count and exposes the corresponding recommendation values.
 - **Precondition / input:** Local resources contain one or more `PlayerCountRecommendation` records.
 - **Action:** Submit `GET /api/games?players={n}`.
@@ -537,8 +532,8 @@ The local model contains only information required for the selected board-game l
 
 - **Identity:** `BggId` is the primary identity of the local board-game resource.
 - **Properties:** `BggId`, `Title`, `MinPlayers`, `MaxPlayers`, `BggAverageRating`, and `BggRatingCount`.
-- **Value constraints:** `BggId` must identify a retrievable BGG game; numeric values must remain valid for their source meaning.
-- **Null / empty:** Required identity/title data must be available; optional source data must not be replaced with invented values.
+- **Value constraints:** `BggId` must identify the BGG game; imported numeric values must preserve their source meaning.
+- **Null / empty:** Required identity/title data must be available; optional source data may be null when BGG does not provide a value.
 
 ### PlayerCountRecommendation
 
@@ -546,6 +541,26 @@ The local model contains only information required for the selected board-game l
 - **Properties:** Player-count bucket, `BestVotes`, `RecommendedVotes`, and `NotRecommendedVotes`.
 - **Player-count representation:** Must preserve source values such as `1`, `2`, `3`, `4`, and `4+` without implying that an open-ended source bucket has a finite upper bound.
 - **Validation responsibility:** External source values are mapped into the local model before persistence; request validation occurs before resource creation.
+
+### BGG data scope
+
+The application imports only the BGG data needed to identify and describe a game and support player-count discovery. It does not mirror the BGG API.
+
+**BoardGame import:**
+
+- BGG ID → `BggId`
+- BGG primary name → `Title`
+- Min Players / Max Players
+- Average Rating → `BggAverageRating`
+- Users Rated → `BggRatingCount`
+
+**Player-count import:**
+
+For each player-count category returned by BGG, store `PlayerCount`, `BestVotes`, `RecommendedVotes`, and `NotRecommendedVotes`. `PlayerCount` must preserve source values such as `1`, `2`, `3`, `4+`, or other returned categories.
+
+Do not create a fabricated solo rating or player-count rating. General BGG rating and player-count recommendation votes remain distinct data.
+
+Do not import additional BGG fields unless a concrete project requirement justifies them.
 
 ## State
 
@@ -632,7 +647,7 @@ A separate service layer remains optional until a concrete responsibility makes 
 
 ### GET /api/games
 
-- **Parameters:** Optional `players` query parameter. Additional filters/sorting are not part of the locked contract yet.
+- **Parameters:** Optional `players` query parameter. Additional filtering/sorting is not part of the locked contract yet.
 - **Return type / HTTP result:** `200 OK` with the locally stored board-game collection.
 - **Errors:** Invalid query value where applicable and persistence failure according to the finalized error contract.
 - **Side effects:** None.
@@ -719,7 +734,7 @@ Detailed verification mapping belongs in `TestPlan.md`.
 - **R19 →** B01 / B02
 - **R20 →** Delivery
 - **R21 →** Only if a service-layer decision is made
-- **R22 →** B03 if GET extensions are selected
+- **R22 →** B03
 - **R23 →** TestPlan / automated verification
 
 > Delivery and verification requirements do not need a system behaviour. Their evidence belongs in `TestPlan.md`.
@@ -733,11 +748,11 @@ Detailed verification mapping belongs in `TestPlan.md`.
 - **Consequence:** The project has an external-data boundary and a local domain model.
 - **Revisit when:** A fundamental constraint makes the direction infeasible.
 
-### D2 — SQL persistence
+### D2 — SQLite persistence
 
-- **Decision:** Use SQL persistence as part of the core project.
-- **Reason:** The project represents a persistent personal library and benefits from querying and retaining externally retrieved data.
-- **Consequence:** EF Core, database setup, migrations/schema work, and asynchronous database access become part of the project.
+- **Decision:** Use SQLite persistence as part of the core project.
+- **Reason:** The project represents a persistent local library and benefits from querying and retaining externally retrieved data.
+- **Consequence:** EF Core, SQLite database setup, migrations/schema work, and asynchronous database access become part of the project.
 - **Revisit when:** The chosen database approach becomes disproportionate to the assignment or technically infeasible.
 
 ### D3 — Entity Framework Core
@@ -805,7 +820,7 @@ Detailed verification mapping belongs in `TestPlan.md`.
 - **Language / target framework:** C# / ASP.NET Core.
 - **Test framework/runner:** xUnit.
 - **SDK version:** To be confirmed during environment setup.
-- **Database:** Local SQL database using Entity Framework Core.
+- **Database:** Local SQLite database using Entity Framework Core.
 - **External integration:** BoardGameGeek API.
 - **Other required setup:** Controller-based REST API project, EF Core configuration, required planning/documentation files, and GitHub repository.
 
@@ -840,7 +855,7 @@ Before implementation begins:
 - [x] Core API routes and operation shapes are selected.
 - [x] Core domain fields and BGG data contract are selected.
 - [x] Required BGG integration boundary is defined.
-- [x] SQL persistence and EF Core direction are decided.
+- [x] SQLite persistence and EF Core direction are decided.
 - [ ] Final validation and dependency-failure behaviour is defined.
 - [ ] Relevant visualization is created if it materially improves understanding.
 - [ ] TestPlan contains the verification design needed for implementation.
@@ -874,117 +889,3 @@ Do not add architecture or optional features merely because they are available.
 - Todoist → work status and task completion when Todoist is used.
 
 A completed task does not replace current project truth.
-
-## BGG data contract
-
-Define the smallest BGG dataset that is sufficient for the chosen project direction.
-
-The purpose is to decide what the application actually depends on before designing the database or implementation.
-
-### Import scope
-
-The application will import board-game data from BoardGameGeek.
-
-Store only data that supports one or more of these purposes:
-
-- identifying the game
-- displaying useful game information
-- describing general BGG popularity/rating
-- describing suitability for different player counts
-- supporting meaningful API queries and filtering
-
-Do not mirror the BGG API. Data is included because the application needs it, not because BGG exposes it.
-
-### Board game data
-
-- **BGG ID** — external identifier used to identify the game in BGG.
-- **Name** — game title.
-- **Year Published** — publication year, where available.
-- **Min Players** — minimum supported player count.
-- **Max Players** — maximum supported player count.
-- **Playing Time** — BGG's reported playing-time value.
-- **Min Playing Time** — minimum reported playing time.
-- **Max Playing Time** — maximum reported playing time.
-- **Min Age** — BGG's reported minimum age.
-- **Average Rating** — general BGG user rating.
-- **Users Rated** — number of BGG users contributing to the rating.
-- **Bayes Average** — BGG's Bayesian average.
-- **Average Weight** — BGG's reported complexity/weight rating.
-- **BGG Rank** — BGG's ranking value, where available.
-- **Best With** — BGG's summarized recommended player-count information.
-- **Recommended With** — BGG's summarized recommended player-count information.
-
-### Player-count recommendations
-
-Player-count suitability is represented separately from the general board-game data.
-
-For each player-count category returned by BGG, store:
-
-- **Player Count**
-- **Best Votes**
-- **Recommended Votes**
-- **Not Recommended Votes**
-
-The representation must support the player-count categories actually returned by BGG, including categories such as `4+` where applicable.
-
-Do not convert these values into a fabricated "solo rating", "two-player rating", or similar score.
-
-The raw vote categories should remain distinguishable so that the application can later derive its own queries or presentation from the underlying data.
-
-### Important distinctions
-
-**General BGG rating is not a player-count rating.**
-
-`Average Rating` describes the game's overall BGG rating and must not be presented as evidence that the game is good for a particular player count.
-
-**BGG rank is not the same as rating.**
-
-`BGG Rank` is contextual ranking information and is not required to determine player-count suitability.
-
-**Min Players / Max Players are not suitability scores.**
-
-They describe the supported player-count range, but do not indicate how well the game works at each player count.
-
-**Best With / Recommended With are summaries.**
-
-The player-count vote data provides more detail about the underlying distribution of recommendations and should remain available independently of the summary fields.
-
-### Explicitly out of scope
-
-Do not import or model BGG data merely because it exists.
-
-The initial implementation does not require:
-
-- designers
-- artists
-- publishers
-- mechanics
-- categories
-- expansions
-- forums
-- comments
-- marketplace data
-- videos
-- images
-- user collections
-- historical rating data
-
-Additional BGG data may be introduced later only when a concrete application requirement justifies it.
-
-### Data ownership
-
-BGG remains the external source of imported game information.
-
-The BoardGame Library API owns its local representation of that information.
-
-Imported BGG data should therefore be treated as external-source data rather than as an uncontrolled mirror of BGG.
-
-### Contract questions
-
-Before implementation, confirm:
-
-- Which BGG fields are actually available from the selected API response?
-- Which fields are optional or can be missing?
-- What exact representation does BGG use for player-count categories?
-- How should missing BGG values be represented in the local database?
-- Which BGG values should be refreshed when an existing game is imported again?

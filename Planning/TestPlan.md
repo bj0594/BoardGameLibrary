@@ -21,7 +21,7 @@ The project must provide evidence that:
 - valid board games can be added through the API and persisted locally;
 - required BoardGameGeek data is retrieved and mapped into the local model;
 - stored games can be retrieved through GET;
-- solo-discovery behaviour follows the finalized query and data rules;
+- player-count discovery follows the finalized query and data rules, with `players=1` serving as the primary solo-discovery use case;
 - invalid requests are rejected without invalid persisted state;
 - relevant external and database failures are handled according to their contracts;
 - required HTTP and asynchronous/non-blocking behaviour is satisfied;
@@ -41,9 +41,9 @@ Use only the evidence needed to establish the relevant contract.
 
 ## Automated testing decision
 
-- **Selected:** Not decided.
-- **Why:** xUnit is optional. The project already has a verification plan using manual observation, implementation inspection, integration evidence, and documentation evidence. If R23 is selected, the planned automated tests below can be implemented without changing the project contracts.
-- **Test project:** [Project name / `Not applicable`]
+- **Selected:** Yes.
+- **Why:** xUnit is a fixed project-workflow decision even though the assignment makes automated testing optional.
+- **Test project:** `BoardGameLibrary.Tests`
 
 ---
 
@@ -51,28 +51,28 @@ Use only the evidence needed to establish the relevant contract.
 
 `Requirement → behaviour → verification / evidence`
 
-- **R1 →** B01 / B02 / B03 / B04 → INT / M / T if selected
-- **R2 →** B02 / B03 → M / T if selected
-- **R3 →** B01 → M / INT / T if selected
-- **R4 →** B04 → M / T if selected
-- **R5 →** B04 / B05 → M / INT / T if selected
-- **R6 →** B01 → M / T if selected
-- **R7 →** B01 / B02 / B03 / B05 → I / INT / T if selected
-- **R8 →** B01 / B02 / B05 → I / INT / T if selected
-- **R9 →** B01 / B02 / B05 → I / T if selected
-- **R10 →** B01 / B02 / B03 / B04 / B05 → M / INT / T if selected
-- **R11 →** B04 / B05 → M / INT / T if selected
+- **R1 →** B01 / B02 / B03 / B04 → INT / M / T
+- **R2 →** B02 / B03 → M / T
+- **R3 →** B01 → M / INT / T
+- **R4 →** B04 → M / T
+- **R5 →** B04 / B05 → M / INT / T
+- **R6 →** B01 → M / T
+- **R7 →** B01 / B02 / B03 / B05 → I / INT / T
+- **R8 →** B01 / B02 / B05 → I / INT / T
+- **R9 →** B01 / B02 / B05 → I / T
+- **R10 →** B01 / B02 / B03 / B04 / B05 → M / INT / T
+- **R11 →** B04 / B05 → M / INT / T
 - **R12 →** Delivery → DOC
-- **R13 →** B01 / B02 / B03 / B04 → I / M / INT / T if selected
+- **R13 →** B01 / B02 / B03 / B04 → I / M / INT / T
 - **R14 →** Delivery → DOC
 - **R15 →** Manual endpoint verification → M
 - **R16 →** Delivery → DOC
-- **R17 →** B01 / B02 → INT / T if selected
-- **R18 →** B01 / B02 → I / INT / T if selected
-- **R19 →** B01 / B02 → I / INT / T if selected
+- **R17 →** B01 / B02 → INT / T
+- **R18 →** B01 / B02 → I / INT / T
+- **R19 →** B01 / B02 → I / INT / T
 - **R20 →** Delivery → DOC
 - **R21 →** Only if a service-layer decision is made
-- **R22 →** B03 if GET extensions are selected → M / T if selected
+- **R22 →** B03 → M / T
 - **R23 →** Automated verification → T
 
 Do not rewrite requirements or behaviour contracts here. `Planning.md` remains authoritative.
@@ -93,9 +93,9 @@ Do not rewrite requirements or behaviour contracts here. `Planning.md` remains a
 - **Purpose:** Demonstrate retrieval of locally persisted games through GET.
 - **Status:** Planned
 
-### M03 — Discover solo-suitable games
-- **Behaviour / requirement:** B03 / R2 / R22 if selected
-- **Purpose:** Demonstrate the finalized solo/player-count query behaviour.
+### M03 — Discover games by player count
+- **Behaviour / requirement:** B03 / R2 / R22
+- **Purpose:** Demonstrate the finalized player-count query behaviour; `players=1` is the primary solo-discovery use case.
 - **Status:** Planned
 
 ### M04 — Reject invalid input
@@ -148,13 +148,13 @@ Do not rewrite requirements or behaviour contracts here. `Planning.md` remains a
 
 # 4. AUTOMATED TEST DESIGN
 
-The following tests are the planned automated set if R23 is selected. They can be implemented as API/integration tests rather than tests of internal implementation details.
+The following tests are the planned automated set. They can be implemented as API/integration tests rather than tests of internal implementation details.
 
 ## T01 — Add valid game and persist local resource
 
 - **Behaviour:** B01
 - **Requirements:** R1, R3, R6, R17, R18, R19
-- **Scenario:** A valid game identifier and valid local input are submitted and the required external data is available.
+- **Scenario:** A valid BGG game identifier is submitted and the required external data is available.
 - **Data:** Representative valid game and library data.
 - **Observation:** HTTP response and database state.
 - **Oracle:** Defined creation response is returned and the expected mapped resource is persisted.
@@ -174,18 +174,18 @@ The following tests are the planned automated set if R23 is selected. They can b
 - **Dependency strategy:** Controlled test database.
 - **Proves:** Correct retrieval from local persistence.
 
-## T03 — Discover solo-suitable games
+## T03 — Discover games by player count
 
 - **Behaviour:** B03
-- **Requirements:** R2, R22 if selected
-- **Scenario:** Stored games contain different finalized solo/player-count values and a valid discovery query is submitted.
-- **Data:** Matching, non-matching, and relevant boundary cases.
+- **Requirements:** R2, R22
+- **Scenario:** Stored games contain recommendation records for different player-count categories and a valid `players` query is submitted.
+- **Data:** Matching, non-matching, and relevant player-count boundary cases.
 - **Observation:** HTTP response and returned collection.
-- **Oracle:** Returned resources satisfy the finalized discovery rule; excluded resources do not.
+- **Oracle:** Every returned resource has recommendation data for the requested player-count bucket and excluded resources do not.
 - **Level:** API / Integration
 - **Dependency strategy:** Controlled test database.
-- **Proves:** The actual solo-discovery query behaviour.
-- **Limitation:** Does not establish that the underlying BGG signal objectively measures solo quality.
+- **Proves:** The player-count discovery query behaviour.
+- **Limitation:** Does not establish that the underlying BGG signal objectively measures game quality for that player count.
 
 ## T04 — Reject invalid POST input
 
@@ -235,8 +235,6 @@ The following tests are the planned automated set if R23 is selected. They can b
 - **Dependency strategy:** Controlled test database and external boundary.
 - **Proves:** Duplicate behaviour is explicit and consistent.
 
-> If automated testing is not selected, T01–T07 remain verification designs rather than implementation commitments.
-
 ## Relevant test dimensions
 
 Consider only categories that reveal meaningful failures:
@@ -279,29 +277,11 @@ If a test is difficult to specify, revisit the behaviour contract, observation b
 
 Record only evidence that automated tests do not adequately establish.
 
-## I01 — Async implementation inspection
+## Evidence rationale
 
-- **Requirement / behaviour:** R7 / R8 / R9 / R19 / B01 / B02 / B05
-- **Property:** External HTTP and database I/O use asynchronous, non-blocking operations without synchronous blocking calls in async methods.
-- **Why:** Internal implementation strategy cannot be fully established from API output.
-
-## I02 — Controller responsibility inspection
-
-- **Requirement / behaviour:** R13 / B01 / B02 / B03 / B04
-- **Property:** Controllers remain responsible for the HTTP boundary rather than absorbing unnecessary domain or persistence logic.
-- **Why:** Responsibility structure is an implementation property.
-
-## M01–M04 — Manual API verification
-
-- **Requirements / behaviours:** R2, R3, R4, R5, R6, R10, R15 / B01–B04
-- **Property:** Required API behaviour can be exercised and demonstrated through an API client.
-- **Why:** Manual endpoint verification is explicitly required by the assignment.
-
-## DOC01–DOC02 — Documentation and delivery
-
-- **Requirements:** R12, R13, R14, R16, R20
-- **Property:** Repository structure, README, database setup documentation, and GitHub/Canvas delivery are complete.
-- **Why:** These are delivery requirements rather than runtime behaviour.
+- **Implementation inspection:** I01–I02 establish internal properties such as asynchronous/non-blocking I/O and responsibility boundaries that API output alone cannot prove.
+- **Manual observation:** M01–M04 establish the externally demonstrated endpoint behaviour required by the assignment.
+- **Documentation / delivery:** DOC01–DOC02 establish repository, README, database setup, and submission requirements.
 
 ---
 
@@ -327,7 +307,7 @@ The entire test suite does not need to exist as code yet, but the intended verif
 - [ ] Important requirements have evidence coverage.
 - [ ] Important behaviours have verification methods.
 - [ ] Required manual, integration, and inspection evidence is identified.
-- [ ] If R23 is selected, all selected automated tests have sufficient design information.
+- [ ] Planned automated tests have sufficient design information.
 - [ ] No verification item requires inventing an unrecorded requirement or behaviour.
 
 ## Implementation hand-off
