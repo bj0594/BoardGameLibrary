@@ -137,7 +137,7 @@ Do not rewrite requirements or behaviour contracts here. `Planning.md` remains a
 ### DOC01 — README and database setup
 - **Requirement:** R14 / R20
 - **Purpose:** Verify API description, run steps, testing instructions, and local SQL setup documentation.
-- **Status:** Planned
+- **Status:** In progress — documentation is aligned with the migration-based setup; final verification remains.
 
 ### DOC02 — Repository and delivery
 - **Requirement:** R12 / R13 / R16
@@ -154,100 +154,185 @@ The following tests are the planned automated set. They can be implemented as AP
 
 - **Behaviour:** B01
 - **Requirements:** R1, R3, R6, R17, R18, R19
-- **Scenario:** A valid BGG game identifier is submitted and the required external data is available.
-- **Data:** Representative valid game and library data.
-- **Observation:** HTTP response and database state.
-- **Oracle:** Defined creation response is returned and the expected mapped resource is persisted.
 - **Level:** API / Integration
-- **Dependency strategy:** Controlled external + test database boundary.
-- **Proves:** The main create/enrich/persist flow.
+- **Dependency strategy:** Controlled BGG boundary + test SQLite database
+
+### Concrete cases
+
+- **T01.1 — Valid game creates and persists**
+  - Submit a valid BGG ID.
+  - Expect `201 Created`.
+  - Verify `Location` points to the created resource.
+  - Verify the returned game contains the expected mapped data.
+  - Verify the game and its player-count recommendations are persisted.
+  - Verify BGG is called once.
+
+T01 proves the main create → enrich → persist flow.
 
 ## T02 — Retrieve stored games
 
 - **Behaviour:** B02
 - **Requirements:** R1, R2, R17, R18, R19
-- **Scenario:** Known resources exist in the test database and a valid GET request is submitted.
-- **Data:** Representative persisted resources.
-- **Observation:** HTTP response and returned resource/collection.
-- **Oracle:** Returned data matches the defined API contract and stored state.
 - **Level:** API / Integration
-- **Dependency strategy:** Controlled test database.
-- **Proves:** Correct retrieval from local persistence.
+- **Dependency strategy:** Controlled SQLite database
+
+### Concrete cases
+
+- **T02.1 — Collection with stored games**
+  - Seed multiple resources.
+  - Expect `200 OK` and all stored resources.
+
+- **T02.2 — Empty collection**
+  - Start with an empty database.
+  - Expect `200 OK` and an empty collection, not `404`.
+
+- **T02.3 — Single resource with recommendations**
+  - Seed a game with player-count recommendations.
+  - Expect `200 OK` with the game and its recommendation data.
+
+- **T02.4 — Missing resource**
+  - Request an ID that does not exist.
+  - Expect `404 Not Found`.
 
 ## T03 — Discover games by player count
 
 - **Behaviour:** B03
-- **Requirements:** R2, R22
-- **Scenario:** Stored games contain recommendation records for different player-count categories and a valid `players` query is submitted.
-- **Data:** Matching, non-matching, and relevant player-count boundary cases.
-- **Observation:** HTTP response and returned collection.
-- **Oracle:** Every returned resource has recommendation data for the requested player-count bucket and excluded resources do not.
+- **Requirements:** R2, R10, R22
 - **Level:** API / Integration
-- **Dependency strategy:** Controlled test database.
-- **Proves:** The player-count discovery query behaviour.
-- **Limitation:** Does not establish that the underlying BGG signal objectively measures game quality for that player count.
+- **Dependency strategy:** Controlled SQLite database
+
+### Concrete cases
+
+- **T03.1 — One-player discovery**
+  - `players=1` returns only games having a `1` recommendation bucket.
+  - This is the primary solo-discovery use case.
+
+- **T03.2 — Other fixed player count**
+  - `players=2` returns only games having a `2` recommendation bucket.
+
+- **T03.3 — Open-ended BGG bucket**
+  - `players=4+` is accepted and matches the stored `4+` category.
+
+- **T03.4 — No matching games**
+  - A valid player-count query with no matches returns `200 OK` and an empty collection.
+
+- **T03.5 — Invalid query value**
+  - Zero, negative, and non-numeric player-count values are rejected with `400 Bad Request`.
+
+The API uses the stored BGG recommendation category; it does not claim that the signal is an objective quality rating.
 
 ## T04 — Reject invalid POST input
 
 - **Behaviour:** B04
 - **Requirements:** R4, R5, R10, R11
-- **Scenario:** POST input violates a finalized validation rule.
-- **Data:** Missing, invalid, or boundary-invalid request data as applicable.
-- **Observation:** HTTP response and database state.
-- **Oracle:** Defined validation response is returned and no invalid resource is persisted.
 - **Level:** API / Integration
-- **Dependency strategy:** Controlled test database and external boundary.
-- **Proves:** Invalid requests cannot create invalid local state.
+- **Dependency strategy:** Controlled SQLite database + controlled BGG boundary
+
+### Concrete cases
+
+- **T04.1 — Zero BGG ID**
+  - Expect `400 Bad Request` with a validation problem response identifying `BggId`.
+  - BGG must not be called.
+  - No resource is persisted.
+
+- **T04.2 — Negative BGG ID**
+  - Expect `400 Bad Request`.
+  - BGG must not be called.
+  - No resource is persisted.
+
+- **T04.3 — Null JSON request body**
+  - Send a JSON `null` request body with the JSON content type.
+  - Expect `400 Bad Request`.
+  - No BGG call is made.
+
+- **T04.4 — Invalid resource ID on GET**
+  - A non-positive route ID returns `400 Bad Request`.
 
 ## T05 — Handle external dependency failure
 
 - **Behaviour:** B01 / B05
 - **Requirements:** R5, R8, R11
-- **Scenario:** The BGG boundary is unavailable, times out, or returns an unusable response in a controlled test setup.
-- **Data:** Otherwise valid request data.
-- **Observation:** HTTP response and resulting state.
-- **Oracle:** Defined failure response is returned and invalid/incomplete state is not persisted.
-- **Level:** Integration
-- **Dependency strategy:** Stub / controlled external boundary.
-- **Proves:** Relevant external-failure handling.
+- **Level:** API / Integration
+- **Dependency strategy:** Controlled BGG boundary
+
+### Concrete cases
+
+- **T05.1 — BGG transport failure**
+  - Simulate an HTTP failure at the BGG boundary.
+  - Expect the defined external-dependency response (`502 Bad Gateway` in the current contract).
+  - No incomplete resource is persisted.
+
+- **T05.2 — BGG resource not found**
+  - Simulate a missing BGG game.
+  - Expect `404 Not Found`.
+  - No resource is persisted.
 
 ## T06 — Handle persistence failure
 
 - **Behaviour:** B01 / B02 / B05
 - **Requirements:** R8, R11, R19
-- **Scenario:** The database boundary fails during create or read.
-- **Data:** Valid representative data.
-- **Observation:** HTTP response and resulting state.
-- **Oracle:** Defined failure response is returned and the API does not report an unsuccessful persistence operation as successful.
-- **Level:** Integration
-- **Dependency strategy:** Controlled database failure.
-- **Proves:** Relevant database-failure handling.
+- **Level:** API / Integration
+- **Dependency strategy:** Controlled database failure
+
+### Concrete cases
+
+- **T06.1 — GET database failure**
+  - Fail the database boundary during collection retrieval.
+  - Expect `500 Internal Server Error`.
+
+- **T06.2 — POST database failure**
+  - Fail the database boundary during creation.
+  - Expect `500 Internal Server Error` rather than a false success.
 
 ## T07 — Duplicate game handling
 
 - **Behaviour:** B01 / B04
 - **Requirements:** R4, R5, R11
-- **Scenario:** The same game is submitted again according to the finalized duplicate rule.
-- **Data:** Repeated valid identifier and relevant library data.
-- **Observation:** HTTP response and database state.
-- **Oracle:** Response and persisted state follow the finalized duplicate rule.
 - **Level:** API / Integration
-- **Dependency strategy:** Controlled test database and external boundary.
-- **Proves:** Duplicate behaviour is explicit and consistent.
+- **Dependency strategy:** Controlled SQLite database + controlled BGG boundary
+
+### Concrete cases
+
+- **T07.1 — Duplicate POST**
+  - Create a valid game once, then submit the same BGG ID again.
+  - Expect `409 Conflict`.
+  - The second request must not call BGG again.
+  - Only one local game and its recommendation records remain persisted.
+
+## Additional external-boundary tests
+
+These tests support INT01 and are separate from the seven top-level behaviour areas because a fake BGG client in T01–T07 cannot prove that the real XML client maps source data correctly.
+
+- **INT01.1 — Map core BGG XML data**
+  - Verify ID, primary name, player range, average rating, and rating count.
+
+- **INT01.2 — Map player-count poll categories**
+  - Verify categories such as `1` and `4+` and all three vote counts.
+
+- **INT01.3 — BGG HTTP status handling**
+  - `404` maps to no game; another unsuccessful response becomes the defined external failure.
+
+- **INT01.4 — BGG request construction**
+  - Verify the client requests the intended `thing` endpoint with `stats=1` and sends the configured bearer token when one is configured.
+
+- **INT01.5 — Malformed BGG XML**
+  - A successful HTTP response containing malformed XML is treated as an external dependency failure and surfaced as the defined `502 Bad Gateway` response at the API boundary.
+
+These tests should remain deterministic and should not call the live BGG service.
 
 ## Relevant test dimensions
 
 Consider only categories that reveal meaningful failures:
 
-- [ ] Happy path
-- [ ] Boundary values
-- [ ] Equivalence partitions
-- [ ] Null / empty
-- [ ] Invalid input
-- [ ] Missing / not found
-- [ ] Duplicate
-- [ ] Dependency failure
-- [ ] Data/type variation
+- [x] Happy path
+- [x] Boundary values
+- [x] Equivalence partitions
+- [x] Null / empty
+- [x] Invalid input
+- [x] Missing / not found
+- [x] Duplicate
+- [x] Dependency failure
+- [x] Data/type variation
 
 Do not create a separate test for every checked category. Reuse existing tests when they already provide the needed evidence.
 
@@ -257,17 +342,17 @@ Do not create a separate test for every checked category. Reuse existing tests w
 
 Before an automated test is considered ready:
 
-- [ ] Referenced behaviour exists in `Planning.md`.
-- [ ] Requirement(s) are known.
-- [ ] Scenario and input are concrete.
-- [ ] Observation point is clear.
-- [ ] Oracle is clear.
-- [ ] Test level matches the boundary being proven.
-- [ ] Dependency strategy is deliberate.
-- [ ] Relevant edge cases have been considered.
-- [ ] HTTP, validation, persistence, and external-failure behaviour are covered where relevant.
-- [ ] A subtly incorrect implementation would be caught.
-- [ ] The test does not invent a requirement or behaviour.
+- [x] Referenced behaviour exists in `Planning.md`.
+- [x] Requirement(s) are known.
+- [x] Scenario and input are concrete.
+- [x] Observation point is clear.
+- [x] Oracle is clear.
+- [x] Test level matches the boundary being proven.
+- [x] Dependency strategy is deliberate.
+- [x] Relevant edge cases have been considered.
+- [x] HTTP, validation, persistence, and external-failure behaviour are covered where relevant.
+- [x] A subtly incorrect implementation would be caught.
+- [x] The test does not invent a requirement or behaviour.
 
 If a test is difficult to specify, revisit the behaviour contract, observation boundary, responsibility, dependency boundary, or oracle before adding complexity.
 
@@ -295,20 +380,20 @@ The entire test suite does not need to exist as code yet, but the intended verif
 
 - [ ] `Planning.md` is complete enough to implement from.
 - [x] Project direction and core scope are clear.
-- [ ] Remaining BGG data and solo-signal decisions are finalized.
-- [ ] Final API routes and response contracts are defined.
-- [ ] Final domain fields and validation rules are defined.
-- [ ] Relevant external and database failure contracts are defined.
+- [x] Remaining BGG data and player-count signal decisions are recorded.
+- [x] Core API routes and required response status behaviour are defined.
+- [x] Core domain fields and current validation rules are defined.
+- [x] Relevant external and database failure status behaviour is defined.
 - [x] SQL persistence and EF Core direction are decided.
-- [ ] Any needed visualization has been completed.
+- [x] No additional visualization is required to begin the current implementation batch.
 
 ## Verification readiness
 
-- [ ] Important requirements have evidence coverage.
-- [ ] Important behaviours have verification methods.
-- [ ] Required manual, integration, and inspection evidence is identified.
-- [ ] Planned automated tests have sufficient design information.
-- [ ] No verification item requires inventing an unrecorded requirement or behaviour.
+- [x] Important requirements have evidence coverage.
+- [x] Important behaviours have verification methods.
+- [x] Required manual, integration, and inspection evidence is identified.
+- [x] Planned automated tests have sufficient design information.
+- [x] No verification item requires inventing an unrecorded requirement or behaviour.
 
 ## Implementation hand-off
 
@@ -327,8 +412,8 @@ Choose how the planned behaviours and verification will be turned into working c
 - **Incremental TDD:** Implement one already-planned behaviour/test at a time through RED → GREEN → REFACTOR → VERIFY.
 - **Hybrid:** Create a limited batch of tests and implement the batch incrementally.
 
-- **Chosen strategy:** [Test-first batch / Incremental TDD / Hybrid]
-- **Why:** [Short reason.]
+- **Chosen strategy:** Test-first batch
+- **Why:** The MVP behaviours have been identified and the project is now using a batch of concrete tests to expose remaining implementation gaps before the corresponding production code is considered complete.
 
 ---
 

@@ -293,21 +293,17 @@ For important requirements:
 
 Use this section only for genuinely unresolved project questions.
 
-- **A2 — GET extensions** · Open question  
-  The core `players` query has been selected, but additional filtering/sorting should only be added if it provides useful behaviour.  
-  **Why it matters:** Determines final GET scope and verification effort.
+- **A2 — Additional GET features** · Deferred  
+  The `players` query is part of the MVP. Additional filtering, sorting, or pagination is deliberately deferred unless a concrete requirement appears.
 
-- **A3 — POST validation rules** · Open question  
-  The exact input-validation rules have not yet been finalized.  
-  **Why it matters:** Determines B04 and the POST error contract.
+- **A3 — POST validation** · Resolved  
+  `BggId` must be greater than zero. ASP.NET Core model validation rejects invalid POST input before BGG or database work occurs.
 
-- **A4 — Error response strategy** · Open question  
-  The relevant failure categories are known, but the final error-response shape and status mapping still need to be defined.  
-  **Why it matters:** Determines B05 and the API error contract.
+- **A4 — Error response strategy** · Resolved  
+  Validation and manually handled API failures use HTTP problem responses with appropriate status codes. The current mappings distinguish client validation, not-found, conflict, external dependency, and database failures.
 
-- **A5 — Service layer** · Open question  
-  A service layer remains optional until a concrete responsibility justifies it.  
-  **Why it matters:** Avoids adding architecture without a real separation need.
+- **A5 — Service layer** · Resolved  
+  A service layer is justified because application behaviour coordinates database access and the external BGG boundary while keeping Controllers focused on HTTP concerns.
 
 - **A6 — Project type** · Assumption · Confirmed  
   This is a new project with no existing behaviour or contracts to preserve.
@@ -431,27 +427,27 @@ Use this section only where a risk or dependency can affect scope, design, testi
 
 Map the important behaviours the project is expected to need. The exact breakdown can be refined after research and API-contract decisions.
 
-- **B01 — Add a board game** · Planned  
+- **B01 — Add a board game** · Implementation / verification  
   **Behaviour:** Accept a valid game identifier and relevant user-provided data, retrieve the required external game information, and create the corresponding local resource.  
   **Importance / risk:** High; crosses validation, HTTP, external I/O, domain mapping, and database persistence.  
   **Dependencies:** BGG API, model, validation, EF Core.
 
-- **B02 — Retrieve board games** · Planned  
+- **B02 — Retrieve board games** · Implementation / verification  
   **Behaviour:** GET retrieves the stored board-game collection or an individual resource according to the finalized API contract.  
   **Importance / risk:** High; establishes the main read API.  
   **Dependencies:** Domain model, database, GET contract.
 
-- **B03 — Discover games by player count** · Planned  
+- **B03 — Discover games by player count** · Implementation / verification  
   **Behaviour:** GET supports meaningful retrieval/filtering based on selected player-count and solo-related data.  
   **Importance / risk:** High; this is the distinctive domain purpose of the project.  
   **Dependencies:** Selected BGG data, local model, query design.
 
-- **B04 — Reject invalid requests** · Planned  
+- **B04 — Reject invalid requests** · Implementation / verification  
   **Behaviour:** Invalid POST input is rejected with clear validation feedback and an appropriate HTTP response.  
   **Importance / risk:** High; directly required by the assignment.  
   **Dependencies:** Validation rules and error contract.
 
-- **B05 — Handle relevant failures** · Planned  
+- **B05 — Handle relevant failures** · Implementation / verification  
   **Behaviour:** Relevant external, persistence, and API failures are handled consistently according to the finalized error strategy.  
   **Importance / risk:** Medium to high.  
   **Dependencies:** Actual boundaries and error decisions.
@@ -625,7 +621,7 @@ Only checked categories require explicit handling. Add or remove categories as t
 
 - **Owner of:** Storing and querying the local board-game library.
 - **Why:** SQL persistence is a selected project requirement.
-- **Notes:** Use EF Core with asynchronous database access.
+- **Notes:** Use EF Core with asynchronous database access. Manage the local SQLite schema with EF Core migrations; tests may use an isolated in-memory SQLite schema.
 
 ### External integration
 
@@ -769,12 +765,12 @@ Detailed verification mapping belongs in `TestPlan.md`.
 - **Consequence:** External-to-local mapping is an explicit part of the design.
 - **Revisit when:** A required behaviour needs additional data.
 
-### D5 — Keep optional architecture conditional
+### D5 — Use a service layer for application coordination
 
-- **Decision:** Do not add a service layer, repository layer, caching, background processing, or other architecture without a concrete responsibility.
-- **Reason:** Preserve project focus.
-- **Consequence:** The implementation remains as simple as the behaviours allow.
-- **Revisit when:** A real responsibility or boundary justifies separation.
+- **Decision:** Use a service layer for operations that coordinate the local database and external BGG boundary.
+- **Reason:** The selected behaviours cross persistence and external-integration boundaries, while Controllers should remain focused on HTTP concerns.
+- **Consequence:** Controllers remain thin; the service owns application-level orchestration.
+- **Revisit when:** The service stops having a concrete responsibility.
 
 ### D6 — Distinguish solo signals from general game rating
 
@@ -832,11 +828,11 @@ Detailed verification mapping belongs in `TestPlan.md`.
 
 ## Baseline
 
-- [ ] Required project structure is ready.
-- [ ] ASP.NET Core API project builds.
-- [ ] SQL/EF Core setup works.
+- [x] Required project structure is ready.
+- [x] ASP.NET Core API project builds.
+- [x] SQL/EF Core setup works.
 - [ ] External HTTP dependency can be reached through the chosen integration approach.
-- [ ] Required toolchain/setup is understood well enough to continue.
+- [x] Required toolchain/setup is understood well enough to continue.
 
 ---
 
@@ -848,7 +844,7 @@ Before implementation begins:
 - [x] Project direction is selected.
 - [x] Portfolio role is identified.
 - [x] Core requirements are identified and sourced.
-- [ ] Direction-dependent open questions are resolved enough for implementation.
+- [x] Direction-dependent open questions are resolved enough for implementation.
 - [x] Scope is defined.
 - [x] Important behaviours are mapped.
 - [x] Behaviour contracts exist for the planned behaviours.
@@ -856,9 +852,9 @@ Before implementation begins:
 - [x] Core domain fields and BGG data contract are selected.
 - [x] Required BGG integration boundary is defined.
 - [x] SQLite persistence and EF Core direction are decided.
-- [ ] Final validation and dependency-failure behaviour is defined.
-- [ ] Relevant visualization is created if it materially improves understanding.
-- [ ] TestPlan contains the verification design needed for implementation.
+- [x] Final validation and dependency-failure behaviour is defined.
+- [x] No additional visualization is required for the current scope.
+- [x] TestPlan contains the verification design needed for implementation.
 
 When this gate passes, Planning is complete enough to hand over to implementation.
 
@@ -866,16 +862,14 @@ When this gate passes, Planning is complete enough to hand over to implementatio
 
 ## NEXT
 
-The next planning decision is to finalize:
+Continue implementation and verification from the behaviour contracts and TestPlan.
 
-1. POST input validation rules.
-2. Duplicate-game behaviour.
-3. Error-response/status mapping for validation, BGG, and database failures.
-4. Whether any GET sorting/filtering beyond `players` is genuinely needed.
-5. Whether a service layer has a concrete responsibility.
-6. Update affected behaviour contracts and decisions.
-7. Update `TestPlan.md` against the finalized contracts.
-8. Re-run the Planning Readiness gate.
+The current priority is:
+
+1. Keep the automated test suite green while correcting the implementation.
+2. Complete the remaining API and BGG integration behaviour.
+3. Verify the database setup and manual API behaviour.
+4. Update this file only when an actual project decision or contract changes.
 
 Do not add architecture or optional features merely because they are available.
 
