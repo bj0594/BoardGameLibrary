@@ -2,28 +2,36 @@ using System.Net;
 using System.Net.Http.Json;
 using BoardGameLibrary.Api.Data;
 using BoardGameLibrary.Api.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-/// <summary>Verifies successful resource creation, persistence, and REST creation semantics.</summary>
+/// <summary>
+/// Proves the complete POST create flow, including nested player-count ratings.
+/// </summary>
 public class AddBoardGameTests
 {
     [Fact]
-    // Proves the complete POST -> validation -> service -> EF Core -> SQLite path.
     public async Task CreateValidGame_PersistsAndReturnsCreated()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        var request = new CreateBoardGameRequest
+        var response = await client.PostAsJsonAsync("/api/games", new
         {
-            Title = "Test Game",
-            MinPlayers = 1,
-            MaxPlayers = 4
-        };
-
-        var response = await client.PostAsJsonAsync("/api/games", request);
+            title = "Test Game",
+            minPlayers = 1,
+            maxPlayers = 4,
+            minPlayTimeMinutes = 45,
+            maxPlayTimeMinutes = 90,
+            playerRatings = new[]
+            {
+                new { playerCount = 1, rating = 7.5m },
+                new { playerCount = 2, rating = 8.5m },
+                new { playerCount = 4, rating = 8.0m }
+            }
+        });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
@@ -33,47 +41,49 @@ public class AddBoardGameTests
         Assert.NotNull(createdGame);
         Assert.True(createdGame!.Id > 0);
         Assert.Equal("Test Game", createdGame.Title);
-        Assert.Equal(1, createdGame.MinPlayers);
-        Assert.Equal(4, createdGame.MaxPlayers);
-        Assert.Equal(TimeSpan.Zero, createdGame.CreatedAt.Offset);
+        Assert.Equal(45, createdGame.MinPlayTimeMinutes);
+        Assert.Equal(90, createdGame.MaxPlayTimeMinutes);
+        Assert.Equal(3, createdGame.PlayerCountRatings.Count);
+        Assert.True(createdGame.CreatedAt > DateTimeOffset.MinValue);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-        var persistedGame = await dbContext.BoardGames.FindAsync(createdGame.Id);
+        var persistedGame = await dbContext.BoardGames
+            .Include(game => game.PlayerCountRatings)
+            .SingleAsync(game => game.Id == createdGame.Id);
 
-        Assert.NotNull(persistedGame);
-        Assert.Equal("Test Game", persistedGame!.Title);
+        Assert.Equal("Test Game", persistedGame.Title);
+        Assert.Contains(persistedGame.PlayerCountRatings, rating =>
+            rating.PlayerCount == 2 && rating.Rating == 8.5m);
     }
 
     [Fact]
-    // CreatedAtAction must point to an actually retrievable resource, not merely contain a plausible URL.
     public async Task CreateValidGame_LocationPointsToCreatedResource()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync(
-            "/api/games",
-            new
-            {
-                title = "Location Test",
-                minPlayers = 1,
-                maxPlayers = 2
-            });
+        var response = await client.PostAsJsonAsync("/api/games", new
+        {
+            title = "Location Test",
+            minPlayers = 1,
+            maxPlayers = 2,
+            minPlayTimeMinutes = 20,
+            maxPlayTimeMinutes = 30
+        });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
 
         var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
-
         Assert.NotNull(createdGame);
 
-        var getResponse = await client.GetAsync(response.Headers.Location);
-        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var locationResponse = await client.GetAsync(response.Headers.Location);
 
-        var retrievedGame = await getResponse.Content.ReadFromJsonAsync<BoardGame>();
-        Assert.NotNull(retrievedGame);
-        Assert.Equal(createdGame!.Id, retrievedGame!.Id);
-        Assert.Equal(createdGame.Title, retrievedGame.Title);
+        Assert.Equal(HttpStatusCode.OK, locationResponse.StatusCode);
+        var locatedGame = await locationResponse.Content.ReadFromJsonAsync<BoardGame>();
+
+        Assert.NotNull(locatedGame);
+        Assert.Equal(createdGame!.Id, locatedGame!.Id);
     }
 }

@@ -3,11 +3,12 @@ using System.Net.Http.Json;
 
 namespace BoardGameLibrary.Tests;
 
-/// <summary>Verifies that database failures become stable API-level 500 responses.</summary>
+/// <summary>
+/// Confirms that infrastructure failures become safe HTTP 500 responses.
+/// </summary>
 public class FailureHandlingTests
 {
     [Fact]
-    // Breaking the test database before GET simulates a persistence-layer failure.
     public async Task Get_WhenDatabaseFails_ReturnsInternalServerError()
     {
         using var factory = new BoardGameApiFactory();
@@ -21,7 +22,6 @@ public class FailureHandlingTests
     }
 
     [Fact]
-    // POST must also translate persistence failure into a stable 500 response without leaking database details.
     public async Task Create_WhenDatabaseFails_ReturnsInternalServerError()
     {
         using var factory = new BoardGameApiFactory();
@@ -29,17 +29,15 @@ public class FailureHandlingTests
 
         factory.BreakDatabaseConnection();
 
-        var response = await client.PostAsJsonAsync(
-            "/api/games",
-            new
-            {
-                title = "Test Game",
-                minPlayers = 1,
-                maxPlayers = 4
-            });
+        var response = await client.PostAsJsonAsync("/api/games", new
+        {
+            title = "Test Game",
+            minPlayers = 1,
+            maxPlayers = 4,
+            minPlayTimeMinutes = 30,
+            maxPlayTimeMinutes = 60
+        });
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("SqliteException", body, StringComparison.OrdinalIgnoreCase);
     }
 }

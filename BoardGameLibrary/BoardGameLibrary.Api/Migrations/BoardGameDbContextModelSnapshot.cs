@@ -23,10 +23,31 @@ namespace BoardGameLibrary.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("BggId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("BggAverageRating")
+                        .HasPrecision(4, 3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BggBestWith")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BggUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MaxPlayTimeMinutes")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("MaxPlayers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MinPlayTimeMinutes")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MinPlayers")
@@ -39,7 +60,45 @@ namespace BoardGameLibrary.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BggId")
+                        .IsUnique();
+
                     b.ToTable("BoardGames");
+                });
+
+            modelBuilder.Entity("BoardGameLibrary.Api.Models.PlayerCountRating", b =>
+                {
+                    b.Property<int>("BoardGameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PlayerCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Rating")
+                        .HasPrecision(3, 1)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("BoardGameId", "PlayerCount");
+
+                    b.HasIndex("PlayerCount");
+
+                    b.ToTable("PlayerCountRatings");
+                });
+
+            modelBuilder.Entity("BoardGameLibrary.Api.Models.PlayerCountRating", b =>
+                {
+                    b.HasOne("BoardGameLibrary.Api.Models.BoardGame", "BoardGame")
+                        .WithMany("PlayerCountRatings")
+                        .HasForeignKey("BoardGameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BoardGame");
+                });
+
+            modelBuilder.Entity("BoardGameLibrary.Api.Models.BoardGame", b =>
+                {
+                    b.Navigation("PlayerCountRatings");
                 });
 #pragma warning restore 612, 618
         }

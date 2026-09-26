@@ -6,11 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-/// <summary>Verifies read-only collection and single-resource GET behaviour.</summary>
+/// <summary>
+/// Verifies read-only collection and single-resource retrieval through the HTTP boundary.
+/// </summary>
 public class GetBoardGamesTests
 {
     [Fact]
-    // Ordering is explicit in the API contract so clients receive deterministic results.
     public async Task GetAll_WithStoredGames_ReturnsAllGamesInStableOrder()
     {
         using var factory = new BoardGameApiFactory();
@@ -21,6 +22,8 @@ public class GetBoardGamesTests
             Title = "Zeta",
             MinPlayers = 2,
             MaxPlayers = 4,
+            MinPlayTimeMinutes = 60,
+            MaxPlayTimeMinutes = 90,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await SeedAsync(factory, new BoardGame
@@ -28,61 +31,64 @@ public class GetBoardGamesTests
             Title = "Alpha",
             MinPlayers = 1,
             MaxPlayers = 2,
+            MinPlayTimeMinutes = 20,
+            MaxPlayTimeMinutes = 30,
             CreatedAt = DateTimeOffset.UtcNow
         });
 
         var response = await client.GetAsync("/api/games");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(games);
         Assert.Equal(["Alpha", "Zeta"], games!.Select(game => game.Title));
     }
 
     [Fact]
-    // A collection endpoint should represent an empty resource collection with 200, not 404.
     public async Task GetAll_WhenEmpty_ReturnsEmptyCollection()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync("/api/games");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(games);
         Assert.Empty(games!);
     }
 
     [Fact]
-    // Proves a known identifier returns the complete persisted resource.
-    public async Task GetById_WhenGameExists_ReturnsGame()
+    public async Task GetById_WithPlayerCount_ReturnsSelectedPlayerRating()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        var seededId = await SeedAsync(factory, new BoardGame
+        var id = await SeedAsync(factory, new BoardGame
         {
             Title = "Test Game",
             MinPlayers = 1,
             MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
+            MinPlayTimeMinutes = 30,
+            MaxPlayTimeMinutes = 60,
+            CreatedAt = DateTimeOffset.UtcNow,
+            PlayerCountRatings =
+            [
+                new() { PlayerCount = 2, Rating = 8.0m },
+                new() { PlayerCount = 4, Rating = 9.0m }
+            ]
         });
 
-        var response = await client.GetAsync($"/api/games/{seededId}");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var response = await client.GetAsync($"/api/games/{id}?players=4");
         var game = await response.Content.ReadFromJsonAsync<BoardGame>();
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(game);
-        Assert.Equal(seededId, game!.Id);
-        Assert.Equal("Test Game", game.Title);
+        Assert.Equal(4, game!.SelectedPlayerCount);
+        Assert.Equal(9.0m, game.SelectedPlayerRating);
     }
 
     [Fact]
-    // A missing single resource is a resource-level 404 rather than a collection-level empty result.
     public async Task GetById_WhenGameDoesNotExist_ReturnsNotFound()
     {
         using var factory = new BoardGameApiFactory();
@@ -93,11 +99,8 @@ public class GetBoardGamesTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private static async Task<int> SeedAsync(
-        BoardGameApiFactory factory,
-        BoardGame game)
+    private static async Task<int> SeedAsync(BoardGameApiFactory factory, BoardGame game)
     {
-        // Seed directly through EF so GET tests focus on retrieval rather than also testing POST.
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
         dbContext.BoardGames.Add(game);

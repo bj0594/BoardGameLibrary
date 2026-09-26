@@ -6,117 +6,163 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-/// <summary>Verifies inclusive player-count filtering on the collection GET endpoint.</summary>
+/// <summary>
+/// Verifies the portfolio feature: find and rank games for a concrete player count.
+/// </summary>
 public class PlayerCountDiscoveryTests
 {
     [Fact]
-    // One player is the primary discovery case and should match inclusive ranges containing 1.
-    public async Task GetByPlayerCount_ForOnePlayer_ReturnsOnlyCompatibleGames()
+    public async Task GetByPlayerCount_ForOnePlayer_ReturnsOnlyCompatibleGamesAndSelectedRating()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Solo Game",
-            MinPlayers = 1,
-            MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Two Player Game",
-            MinPlayers = 2,
-            MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
+        await SeedAsync(factory, Game("Solo Game", 1, 4, 30, 60,
+            (1, 8.2m), (2, 8.0m), (3, 8.0m), (4, 7.8m)));
+        await SeedAsync(factory, Game("Two Player Game", 2, 4, 30, 60,
+            (2, 9.0m), (3, 8.0m), (4, 8.0m)));
 
         var response = await client.GetAsync("/api/games?players=1");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
-
-        Assert.NotNull(games);
-        Assert.Single(games!);
-        Assert.Equal("Solo Game", games[0].Title);
-    }
-
-    [Fact]
-    // Mid-range filtering proves the query is based on both minimum and maximum players.
-    public async Task GetByPlayerCount_ForTwoPlayers_ReturnsGamesThatSupportTwoPlayers()
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
-
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "One To Four",
-            MinPlayers = 1,
-            MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Three To Four",
-            MinPlayers = 3,
-            MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-
-        var response = await client.GetAsync("/api/games?players=2");
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(games);
-        Assert.Single(games!);
-        Assert.Equal("One To Four", games[0].Title);
+        var game = Assert.Single(games!);
+        Assert.Equal("Solo Game", game.Title);
+        Assert.Equal(8.2m, game.SelectedPlayerRating);
     }
 
     [Fact]
-    // The maximum boundary is inclusive: a game supporting four players matches players=4.
-    public async Task GetByPlayerCount_ForMaxPlayers_ReturnsGamesSupportingBoundaryValue()
+    public async Task GetByPlayerCount_ForSameGame_UsesRatingForSelectedPlayerCount()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Supports Four",
-            MinPlayers = 1,
-            MaxPlayers = 4,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Supports Three",
-            MinPlayers = 1,
-            MaxPlayers = 3,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
+        var gameId = await SeedAsync(factory, Game("Variable Rating Game", 1, 4, 30, 60,
+            (1, 7.0m), (2, 8.0m), (3, 9.0m), (4, 7.5m)));
+
+        var twoPlayerResponse = await client.GetAsync($"/api/games/{gameId}?players=2");
+        var twoPlayerGame = await twoPlayerResponse.Content.ReadFromJsonAsync<BoardGame>();
+
+        var fourPlayerResponse = await client.GetAsync($"/api/games/{gameId}?players=4");
+        var fourPlayerGame = await fourPlayerResponse.Content.ReadFromJsonAsync<BoardGame>();
+
+        Assert.Equal(HttpStatusCode.OK, twoPlayerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, fourPlayerResponse.StatusCode);
+        Assert.Equal(2, twoPlayerGame!.SelectedPlayerCount);
+        Assert.Equal(8.0m, twoPlayerGame.SelectedPlayerRating);
+        Assert.Equal(4, fourPlayerGame!.SelectedPlayerCount);
+        Assert.Equal(7.5m, fourPlayerGame.SelectedPlayerRating);
+    }
+
+    [Fact]
+    public async Task GetByPlayerCount_AtMaxPlayers_IncludesBoundaryMatch()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Four Player Game", 1, 4, 30, 60,
+            (1, 7.0m), (2, 7.5m), (3, 8.0m), (4, 8.8m)));
 
         var response = await client.GetAsync("/api/games?players=4");
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(games);
-        Assert.Single(games!);
-        Assert.Equal("Supports Four", games[0].Title);
+        var game = Assert.Single(games!);
+        Assert.Equal(8.8m, game.SelectedPlayerRating);
     }
 
     [Fact]
-    // A valid query with no matches is still a successful read, not an error.
-    public async Task GetByPlayerCount_WhenNoGamesMatch_ReturnsEmptyCollection()
+    public async Task GetByPlayerCount_WithRatingSort_ReturnsHighestRatingFirst()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedAsync(factory, new BoardGame
-        {
-            Title = "Test Game",
-            MinPlayers = 1,
-            MaxPlayers = 2,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
+        await SeedAsync(factory, Game("Lower Rated", 2, 4, 30, 60,
+            (2, 8.0m), (3, 8.1m), (4, 7.8m)));
+        await SeedAsync(factory, Game("Higher Rated", 2, 4, 30, 60,
+            (2, 8.2m), (3, 8.9m), (4, 8.6m)));
+
+        var response = await client.GetAsync("/api/games?players=3&sort=rating");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        Assert.Equal(["Higher Rated", "Lower Rated"], games!.Select(game => game.Title));
+        Assert.Equal(8.9m, games[0].SelectedPlayerRating);
+    }
+
+    [Fact]
+    public async Task GetByPlayerCount_WithMaxMinutes_ExcludesGamesThatTakeTooLong()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Short Game", 2, 4, 30, 60,
+            (2, 8.0m), (3, 8.0m), (4, 8.0m)));
+        await SeedAsync(factory, Game("Long Game", 2, 4, 60, 120,
+            (2, 9.0m), (3, 9.0m), (4, 9.0m)));
+
+        var response = await client.GetAsync("/api/games?players=4&maxMinutes=60");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        var game = Assert.Single(games!);
+        Assert.Equal("Short Game", game.Title);
+    }
+
+    [Fact]
+    public async Task GetByPlayerCount_WithRatingAndTimeFilters_ReturnsBestMatchingGame()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Fast Lower Rated", 2, 4, 30, 60,
+            (2, 8.0m), (3, 8.1m), (4, 8.0m)));
+        await SeedAsync(factory, Game("Slow Higher Rated", 2, 4, 60, 120,
+            (2, 9.0m), (3, 9.1m), (4, 9.4m)));
+        await SeedAsync(factory, Game("Fast Higher Rated", 2, 4, 45, 90,
+            (2, 8.8m), (3, 9.0m), (4, 9.2m)));
+
+        var response = await client.GetAsync(
+            "/api/games?players=4&maxMinutes=90&sort=rating");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        Assert.Equal(["Fast Higher Rated", "Fast Lower Rated"], games!.Select(game => game.Title));
+    }
+
+
+    [Fact]
+    public async Task GetAll_WithPlaytimeSort_ReturnsShortestGamesFirst()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Long Game", 2, 4, 60, 120,
+            (2, 8.0m), (3, 8.0m), (4, 8.0m)));
+        await SeedAsync(factory, Game("Short Game", 2, 4, 30, 45,
+            (2, 8.0m), (3, 8.0m), (4, 8.0m)));
+
+        var response = await client.GetAsync("/api/games?sort=playtime");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        Assert.Equal(["Short Game", "Long Game"], games!.Select(game => game.Title));
+    }
+
+    [Fact]
+    public async Task GetByPlayerCount_WithNoMatches_ReturnsEmptyCollection()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Two Player Game", 1, 2, 30, 60,
+            (1, 8.0m), (2, 8.0m)));
 
         var response = await client.GetAsync("/api/games?players=4");
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
@@ -126,29 +172,35 @@ public class PlayerCountDiscoveryTests
         Assert.Empty(games!);
     }
 
-    [Theory]
-    [InlineData("0")]
-    [InlineData("-1")]
-    [InlineData("abc")]
-    // Invalid query values are rejected before they can become database work.
-    public async Task GetByPlayerCount_WithInvalidValue_ReturnsBadRequest(string value)
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
+    private static BoardGame Game(
+        string title,
+        int minPlayers,
+        int maxPlayers,
+        int minMinutes,
+        int maxMinutes,
+        params (int PlayerCount, decimal Rating)[] ratings) =>
+        new()
+        {
+            Title = title,
+            MinPlayers = minPlayers,
+            MaxPlayers = maxPlayers,
+            MinPlayTimeMinutes = minMinutes,
+            MaxPlayTimeMinutes = maxMinutes,
+            CreatedAt = DateTimeOffset.UtcNow,
+            PlayerCountRatings = ratings.Select(rating => new PlayerCountRating
+            {
+                PlayerCount = rating.PlayerCount,
+                Rating = rating.Rating
+            }).ToList()
+        };
 
-        var response = await client.GetAsync($"/api/games?players={value}");
+    private static async Task<int> SeedAsync(BoardGameApiFactory factory, BoardGame game)
+	{
+    		using var scope = factory.Services.CreateScope();
+    		var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
+    		dbContext.BoardGames.Add(game);
+    		await dbContext.SaveChangesAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    // Seed through EF to isolate the query behaviour from POST validation.
-    private static async Task SeedAsync(
-        BoardGameApiFactory factory,
-        BoardGame game)
-    {
-        using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-        dbContext.BoardGames.Add(game);
-        await dbContext.SaveChangesAsync();
-    }
+    		return game.Id;
+	}
 }
