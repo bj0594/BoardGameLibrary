@@ -47,7 +47,8 @@ public class BoardGameService(BoardGameDbContext dbContext)
 
         if (maxMinutes.HasValue)
         {
-            query = query.Where(game => game.MaxPlayTimeMinutes <= maxMinutes.Value);
+            query = query.Where(game =>
+                game.MaxPlayTimeMinutes <= maxMinutes.Value);
         }
 
         var normalizedSort = string.IsNullOrWhiteSpace(sort)
@@ -66,14 +67,7 @@ public class BoardGameService(BoardGameDbContext dbContext)
                 .ThenBy(game => game.Id),
 
             "rating" when players.HasValue => query
-                .OrderByDescending(game =>
-                    game.PlayerCountRatings.Any(rating => rating.PlayerCount == players.Value))
-                .ThenByDescending(game =>
-                    game.PlayerCountRatings
-                        .Where(rating => rating.PlayerCount == players.Value)
-                        .Select(rating => (decimal?)rating.Rating)
-                        .FirstOrDefault())
-                .ThenBy(game => game.Title)
+                .OrderBy(game => game.Title)
                 .ThenBy(game => game.Id),
 
             _ => throw new ArgumentException(
@@ -86,6 +80,16 @@ public class BoardGameService(BoardGameDbContext dbContext)
         foreach (var game in games)
         {
             SetSelectedRating(game, players);
+        }
+
+        if (normalizedSort == "rating" && players.HasValue)
+        {
+            games = games
+                .OrderByDescending(game => game.SelectedPlayerRating.HasValue)
+                .ThenByDescending(game => game.SelectedPlayerRating)
+                .ThenBy(game => game.Title)
+                .ThenBy(game => game.Id)
+                .ToList();
         }
 
         return games;
