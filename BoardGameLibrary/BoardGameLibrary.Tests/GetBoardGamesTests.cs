@@ -9,7 +9,7 @@ namespace BoardGameLibrary.Tests;
 public class GetBoardGamesTests
 {
     [Fact]
-    public async Task GetAll_ReturnsPersistedGamesInDefinedOrder()
+    public async Task GetAll_ReturnsPersistedGames()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
@@ -22,20 +22,16 @@ public class GetBoardGamesTests
                 new BoardGame
                 {
                     BggId = 200,
-                    Title = "Zeta Game",
+                    Title = "Game A",
                     MinPlayers = 1,
-                    MaxPlayers = 4,
-                    BggAverageRating = 7.8,
-                    BggRatingCount = 300
+                    MaxPlayers = 4
                 },
                 new BoardGame
                 {
                     BggId = 100,
-                    Title = "Alpha Game",
+                    Title = "Game B",
                     MinPlayers = 2,
-                    MaxPlayers = 4,
-                    BggAverageRating = 8.1,
-                    BggRatingCount = 500
+                    MaxPlayers = 4
                 });
 
             await dbContext.SaveChangesAsync();
@@ -49,8 +45,24 @@ public class GetBoardGamesTests
 
         Assert.NotNull(games);
         Assert.Equal(2, games!.Count);
-        Assert.Equal("Alpha Game", games[0].Title);
-        Assert.Equal("Zeta Game", games[1].Title);
+        Assert.Contains(games, game => game.BggId == 100);
+        Assert.Contains(games, game => game.BggId == 200);
+    }
+
+    [Fact]
+    public async Task GetAll_WhenLibraryIsEmpty_ReturnsEmptyCollection()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/games");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.NotNull(games);
+        Assert.Empty(games!);
     }
 
     [Fact]

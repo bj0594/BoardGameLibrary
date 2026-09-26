@@ -15,23 +15,24 @@ public class AddBoardGameTests
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        var request = new CreateBoardGameRequest
-        {
-            BggId = 12345
-        };
-
-        var response = await client.PostAsJsonAsync("/api/games", request);
+        var response = await client.PostAsJsonAsync(
+            "/api/games",
+            new CreateBoardGameRequest { BggId = 12345 });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal("/api/games/12345", response.Headers.Location?.AbsolutePath);
+        Assert.Equal(1, factory.FakeBggClient.CallCount);
 
         var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
 
         Assert.NotNull(createdGame);
         Assert.Equal(12345, createdGame!.BggId);
         Assert.Equal("Test Game", createdGame.Title);
-        Assert.Single(createdGame.PlayerCountRecommendations);
-        Assert.Equal("1", createdGame.PlayerCountRecommendations[0].PlayerCount);
+        Assert.Equal(1, createdGame.MinPlayers);
+        Assert.Equal(4, createdGame.MaxPlayers);
+        Assert.Equal(8.2, createdGame.BggAverageRating);
+        Assert.Equal(1000, createdGame.BggRatingCount);
+        Assert.Equal(3, createdGame.PlayerCountRecommendations.Count);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
@@ -42,12 +43,17 @@ public class AddBoardGameTests
 
         Assert.NotNull(persistedGame);
         Assert.Equal("Test Game", persistedGame!.Title);
-        Assert.Single(persistedGame.PlayerCountRecommendations);
+        Assert.Equal(3, persistedGame.PlayerCountRecommendations.Count);
 
-        var persistedRecommendation = persistedGame.PlayerCountRecommendations.Single();
-        Assert.Equal("1", persistedRecommendation.PlayerCount);
-        Assert.Equal(20, persistedRecommendation.BestVotes);
-        Assert.Equal(15, persistedRecommendation.RecommendedVotes);
-        Assert.Equal(5, persistedRecommendation.NotRecommendedVotes);
+        var soloRecommendation = persistedGame.PlayerCountRecommendations
+            .Single(recommendation => recommendation.PlayerCount == "1");
+
+        Assert.Equal(20, soloRecommendation.BestVotes);
+        Assert.Equal(15, soloRecommendation.RecommendedVotes);
+        Assert.Equal(5, soloRecommendation.NotRecommendedVotes);
+
+        Assert.Contains(
+            persistedGame.PlayerCountRecommendations,
+            recommendation => recommendation.PlayerCount == "4+");
     }
 }

@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace BoardGameLibrary.Tests;
 
@@ -114,6 +114,13 @@ public sealed class FakeBoardGameGeekClient : IBoardGameGeekClient
                     BestVotes = 30,
                     RecommendedVotes = 20,
                     NotRecommendedVotes = 2
+                },
+                new PlayerCountRecommendation
+                {
+                    PlayerCount = "4+",
+                    BestVotes = 12,
+                    RecommendedVotes = 8,
+                    NotRecommendedVotes = 3
                 }
             ]
         };
