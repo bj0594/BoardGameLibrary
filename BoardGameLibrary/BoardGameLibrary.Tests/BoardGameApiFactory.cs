@@ -66,7 +66,8 @@ public enum FakeBggFailureMode
 {
     None,
     NotFound,
-    HttpRequestException
+    HttpRequestException,
+    MalformedXml
 }
 
 public sealed class FakeBoardGameGeekClient : IBoardGameGeekClient
@@ -85,6 +86,7 @@ public sealed class FakeBoardGameGeekClient : IBoardGameGeekClient
         {
             FakeBggFailureMode.NotFound => Task.FromResult<BoardGame?>(null),
             FakeBggFailureMode.HttpRequestException => throw new HttpRequestException("Controlled BGG failure."),
+            FakeBggFailureMode.MalformedXml => throw new HttpRequestException("BoardGameGeek returned malformed XML."),
             _ => Task.FromResult<BoardGame?>(CreateGame(bggId))
         };
     }

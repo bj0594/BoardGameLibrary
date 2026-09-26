@@ -25,6 +25,24 @@ public class FailureHandlingTests
     }
 
     [Fact]
+    public async Task Create_WhenBggReturnsMalformedXml_ReturnsBadGatewayAndDoesNotPersist()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+        factory.FakeBggClient.FailureMode = FakeBggFailureMode.MalformedXml;
+
+        var response = await client.PostAsJsonAsync(
+            "/api/games",
+            new { BggId = 54321 });
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
+        Assert.Empty(dbContext.BoardGames);
+    }
+
+    [Fact]
     public async Task Create_WhenBggGameDoesNotExist_ReturnsNotFoundAndDoesNotPersist()
     {
         using var factory = new BoardGameApiFactory();
