@@ -1,2 +1,6 @@
+# .NET build output
+bin/
+obj/
 
+# Local SQLite database
 *.db
