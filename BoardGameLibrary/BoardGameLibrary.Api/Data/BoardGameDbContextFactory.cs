@@ -10,8 +10,7 @@ public sealed class BoardGameDbContextFactory
     {
         var optionsBuilder = new DbContextOptionsBuilder<BoardGameDbContext>();
 
-        optionsBuilder.UseSqlite(
-            "Data Source=boardgamelibrary.db");
+        optionsBuilder.UseSqlite("Data Source=boardgamelibrary.db");
 
         return new BoardGameDbContext(optionsBuilder.Options);
     }

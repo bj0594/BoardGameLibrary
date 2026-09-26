@@ -9,175 +9,109 @@ namespace BoardGameLibrary.Tests;
 public class PlayerCountDiscoveryTests
 {
     [Fact]
-    public async Task GetByPlayerCount_ForOnePlayer_ReturnsOnlyGamesWithMatchingRecommendation()
+    public async Task GetByPlayerCount_ForOnePlayer_ReturnsOnlyCompatibleGames()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedGamesAsync(factory);
+        await SeedAsync(factory, new BoardGame
+        {
+            Title = "Solo Game",
+            MinPlayers = 1,
+            MaxPlayers = 4,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await SeedAsync(factory, new BoardGame
+        {
+            Title = "Two Player Game",
+            MinPlayers = 2,
+            MaxPlayers = 4,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
 
         var response = await client.GetAsync("/api/games?players=1");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
         Assert.NotNull(games);
-        var game = Assert.Single(games!);
-        Assert.Equal(100, game.BggId);
-        Assert.Contains(game.PlayerCountRecommendations,
-            recommendation => recommendation.PlayerCount == "1");
+        Assert.Single(games!);
+        Assert.Equal("Solo Game", games[0].Title);
     }
 
     [Fact]
-    public async Task GetByPlayerCount_ForTwoPlayers_ReturnsOnlyGamesWithMatchingRecommendation()
+    public async Task GetByPlayerCount_ForTwoPlayers_ReturnsGamesThatSupportTwoPlayers()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedGamesAsync(factory);
+        await SeedAsync(factory, new BoardGame
+        {
+            Title = "One To Four",
+            MinPlayers = 1,
+            MaxPlayers = 4,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await SeedAsync(factory, new BoardGame
+        {
+            Title = "Three To Four",
+            MinPlayers = 3,
+            MaxPlayers = 4,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
 
         var response = await client.GetAsync("/api/games?players=2");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(games);
-        Assert.Equal(2, games!.Count);
-        Assert.All(games, game =>
-            Assert.Contains(game.PlayerCountRecommendations,
-                recommendation => recommendation.PlayerCount == "2"));
+        Assert.Single(games!);
+        Assert.Equal("One To Four", games[0].Title);
     }
 
     [Fact]
-    public async Task GetByPlayerCount_ForFourPlusPlayers_SupportsBggBucket()
+    public async Task GetByPlayerCount_WhenNoGamesMatch_ReturnsEmptyCollection()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        await SeedGamesAsync(factory);
+        await SeedAsync(factory, new BoardGame
+        {
+            Title = "Test Game",
+            MinPlayers = 1,
+            MaxPlayers = 2,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
 
-        var response = await client.GetAsync("/api/games?players=4%2B");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
+        var response = await client.GetAsync("/api/games?players=4");
         var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
 
-        Assert.NotNull(games);
-        var game = Assert.Single(games!);
-        Assert.Equal(100, game.BggId);
-        Assert.Contains(game.PlayerCountRecommendations,
-            recommendation => recommendation.PlayerCount == "4+");
-    }
-
-    [Fact]
-    public async Task GetByPlayerCount_WhenNoGameMatches_ReturnsEmptyCollection()
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
-
-        await SeedGamesAsync(factory);
-
-        var response = await client.GetAsync("/api/games?players=3");
-
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
-
         Assert.NotNull(games);
         Assert.Empty(games!);
     }
 
-    [Fact]
-    public async Task GetByPlayerCount_WithZero_ReturnsBadRequest()
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("abc")]
+    public async Task GetByPlayerCount_WithInvalidValue_ReturnsBadRequest(string value)
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/api/games?players=0");
+        var response = await client.GetAsync($"/api/games?players={value}");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-
-    [Fact]
-    public async Task GetByPlayerCount_WithNegativeValue_ReturnsBadRequest()
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/api/games?players=-1");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetByPlayerCount_WithNonNumericValue_ReturnsBadRequest()
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/api/games?players=abc");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    private static async Task SeedGamesAsync(BoardGameApiFactory factory)
+    private static async Task SeedAsync(
+        BoardGameApiFactory factory,
+        BoardGame game)
     {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-
-        dbContext.BoardGames.AddRange(
-            new BoardGame
-            {
-                BggId = 100,
-                Title = "Player Count Game",
-                MinPlayers = 1,
-                MaxPlayers = 4,
-                PlayerCountRecommendations =
-                [
-                    new PlayerCountRecommendation
-                    {
-                        PlayerCount = "1",
-                        BestVotes = 20,
-                        RecommendedVotes = 10,
-                        NotRecommendedVotes = 2
-                    },
-                    new PlayerCountRecommendation
-                    {
-                        PlayerCount = "2",
-                        BestVotes = 30,
-                        RecommendedVotes = 20,
-                        NotRecommendedVotes = 1
-                    },
-                    new PlayerCountRecommendation
-                    {
-                        PlayerCount = "4+",
-                        BestVotes = 12,
-                        RecommendedVotes = 8,
-                        NotRecommendedVotes = 3
-                    }
-                ]
-            },
-            new BoardGame
-            {
-                BggId = 200,
-                Title = "Two Player Game",
-                MinPlayers = 2,
-                MaxPlayers = 4,
-                PlayerCountRecommendations =
-                [
-                    new PlayerCountRecommendation
-                    {
-                        PlayerCount = "2",
-                        BestVotes = 40,
-                        RecommendedVotes = 10,
-                        NotRecommendedVotes = 1
-                    }
-                ]
-            });
-
+        dbContext.BoardGames.Add(game);
         await dbContext.SaveChangesAsync();
     }
 }

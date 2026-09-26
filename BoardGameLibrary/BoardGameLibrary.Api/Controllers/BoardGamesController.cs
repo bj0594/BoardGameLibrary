@@ -1,4 +1,3 @@
-using System.Globalization;
 using BoardGameLibrary.Api.Models;
 using BoardGameLibrary.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,24 +10,21 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BoardGame>>> GetAll(
-        [FromQuery] string? players,
+        [FromQuery] int? players,
         CancellationToken cancellationToken)
     {
-        var normalizedPlayers = players?.Trim();
-
-        if (!string.IsNullOrWhiteSpace(normalizedPlayers) &&
-            !IsValidPlayerCountBucket(normalizedPlayers))
+        if (players <= 0)
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid player-count query.",
-                detail: "The players query parameter must be a positive player count or a BGG bucket such as '4+'.");
+                title: "Invalid player count.",
+                detail: "The players query parameter must be greater than zero.");
         }
 
         try
         {
             return Ok(await boardGameService.GetAllAsync(
-                normalizedPlayers,
+                players,
                 cancellationToken));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -39,27 +35,27 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
         }
     }
 
-    [HttpGet("{bggId:int}")]
+    [HttpGet("{id:int}")]
     public async Task<ActionResult<BoardGame>> GetById(
-        int bggId,
+        int id,
         CancellationToken cancellationToken)
     {
-        if (bggId <= 0)
+        if (id <= 0)
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid BGG ID.",
-                detail: "The BGG ID must be greater than zero.");
+                title: "Invalid board-game ID.",
+                detail: "The board-game ID must be greater than zero.");
         }
 
         try
         {
-            var game = await boardGameService.GetAsync(
-                bggId,
-                cancellationToken);
+            var game = await boardGameService.GetAsync(id, cancellationToken);
 
             return game is null
-                ? NotFound()
+                ? Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Board game not found.")
                 : Ok(game);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -72,40 +68,27 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
 
     [HttpPost]
     public async Task<ActionResult<BoardGame>> Create(
-        CreateBoardGameRequest request,
+        CreateBoardGameRequest? request,
         CancellationToken cancellationToken)
     {
+        if (request is null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Request body is required.",
+                detail: "Provide a JSON object containing title, minPlayers, and maxPlayers.");
+        }
+
         try
         {
             var game = await boardGameService.AddAsync(
-                request.BggId,
+                request,
                 cancellationToken);
 
             return CreatedAtAction(
                 nameof(GetById),
-                new { bggId = game.BggId },
+                new { id = game.Id },
                 game);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Board game already exists.",
-                detail: exception.Message);
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status404NotFound,
-                title: "BoardGameGeek game not found.",
-                detail: exception.Message);
-        }
-        catch (HttpRequestException)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status502BadGateway,
-                title: "BoardGameGeek request failed.",
-                detail: "The external BoardGameGeek service could not be reached or returned an unsuccessful response.");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -113,19 +96,5 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Board game could not be persisted.");
         }
-    }
-
-    private static bool IsValidPlayerCountBucket(string value)
-    {
-        var numericPart = value.EndsWith('+')
-            ? value[..^1]
-            : value;
-
-        return int.TryParse(
-            numericPart,
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var playerCount)
-            && playerCount > 0;
     }
 }

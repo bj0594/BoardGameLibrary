@@ -2,58 +2,71 @@ using System.Net;
 using System.Net.Http.Json;
 using BoardGameLibrary.Api.Data;
 using BoardGameLibrary.Api.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-public class AddBoardGameTests
+public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
 {
-    [Fact]
-    public async Task CreateValidGame_PersistsEnrichedResourceAndReturnsCreated()
-    {
-        using var factory = new BoardGameApiFactory();
-        using var client = factory.CreateClient();
+    private readonly HttpClient client;
+    private readonly BoardGameApiFactory factory;
 
-        var response = await client.PostAsJsonAsync(
-            "/api/games",
-            new CreateBoardGameRequest { BggId = 12345 });
+    public AddBoardGameTests(BoardGameApiFactory factory)
+    {
+        this.factory = factory;
+        client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task CreateValidGame_PersistsAndReturnsCreated()
+    {
+        var request = new CreateBoardGameRequest
+        {
+            Title = "Test Game",
+            MinPlayers = 1,
+            MaxPlayers = 4
+        };
+
+        var response = await client.PostAsJsonAsync("/api/games", request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal("/api/games/12345", response.Headers.Location?.AbsolutePath);
-        Assert.Equal(1, factory.FakeBggClient.CallCount);
+        Assert.NotNull(response.Headers.Location);
 
         var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
 
         Assert.NotNull(createdGame);
-        Assert.Equal(12345, createdGame!.BggId);
+        Assert.True(createdGame!.Id > 0);
         Assert.Equal("Test Game", createdGame.Title);
         Assert.Equal(1, createdGame.MinPlayers);
         Assert.Equal(4, createdGame.MaxPlayers);
-        Assert.Equal(8.2, createdGame.BggAverageRating);
-        Assert.Equal(1000, createdGame.BggRatingCount);
-        Assert.Equal(3, createdGame.PlayerCountRecommendations.Count);
+        Assert.True(createdGame.CreatedAt > DateTimeOffset.MinValue);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-
-        var persistedGame = await dbContext.BoardGames
-            .Include(game => game.PlayerCountRecommendations)
-            .SingleOrDefaultAsync(game => game.BggId == 12345);
+        var persistedGame = await dbContext.BoardGames.FindAsync(createdGame.Id);
 
         Assert.NotNull(persistedGame);
         Assert.Equal("Test Game", persistedGame!.Title);
-        Assert.Equal(3, persistedGame.PlayerCountRecommendations.Count);
+    }
 
-        var soloRecommendation = persistedGame.PlayerCountRecommendations
-            .Single(recommendation => recommendation.PlayerCount == "1");
+    [Fact]
+    public async Task CreateValidGame_LocationPointsToCreatedResource()
+    {
+        var response = await client.PostAsJsonAsync(
+            "/api/games",
+            new
+            {
+                title = "Location Test",
+                minPlayers = 1,
+                maxPlayers = 2
+            });
 
-        Assert.Equal(20, soloRecommendation.BestVotes);
-        Assert.Equal(15, soloRecommendation.RecommendedVotes);
-        Assert.Equal(5, soloRecommendation.NotRecommendedVotes);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
 
-        Assert.Contains(
-            persistedGame.PlayerCountRecommendations,
-            recommendation => recommendation.PlayerCount == "4+");
+        var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
+
+        Assert.NotNull(createdGame);
+        Assert.Contains($"/api/games/{createdGame!.Id}", response.Headers.Location!.ToString());
     }
 }

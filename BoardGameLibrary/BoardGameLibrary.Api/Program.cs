@@ -13,20 +13,7 @@ var connectionString = builder.Configuration.GetConnectionString("BoardGameLibra
 builder.Services.AddDbContext<BoardGameDbContext>(options =>
     options.UseSqlite(connectionString));
 
-builder.Services.AddHttpClient<IBoardGameGeekClient, BoardGameGeekClient>(client =>
-{
-    client.BaseAddress = new Uri("https://boardgamegeek.com/");
-});
-
 builder.Services.AddScoped<BoardGameService>();
-
-if (!builder.Environment.IsEnvironment("Testing") &&
-    string.IsNullOrWhiteSpace(
-        builder.Configuration["BoardGameGeek:AuthorizationToken"]))
-{
-    throw new InvalidOperationException(
-        "BoardGameGeek authorization is required. Configure BoardGameGeek:AuthorizationToken locally.");
-}
 
 var app = builder.Build();
 
@@ -40,12 +27,10 @@ if (!app.Environment.IsEnvironment("Testing"))
     app.UseHttpsRedirection();
 }
 
-
 app.MapControllers();
 
 app.Run();
 
 public partial class Program
 {
-    
 }

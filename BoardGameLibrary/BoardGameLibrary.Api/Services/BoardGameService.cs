@@ -4,68 +4,51 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BoardGameLibrary.Api.Services;
 
-public class BoardGameService(
-    BoardGameDbContext dbContext,
-    IBoardGameGeekClient bggClient)
+public class BoardGameService(BoardGameDbContext dbContext)
 {
     public async Task<BoardGame?> GetAsync(
-        int bggId,
+        int id,
         CancellationToken cancellationToken)
         => await dbContext.BoardGames
-            .Include(game => game.PlayerCountRecommendations)
+            .AsNoTracking()
             .SingleOrDefaultAsync(
-                game => game.BggId == bggId,
+                game => game.Id == id,
                 cancellationToken);
 
     public async Task<List<BoardGame>> GetAllAsync(
-        string? players,
+        int? players,
         CancellationToken cancellationToken)
     {
         var query = dbContext.BoardGames
-            .Include(game => game.PlayerCountRecommendations)
+            .AsNoTracking()
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(players))
+        if (players.HasValue)
         {
             query = query.Where(game =>
-                game.PlayerCountRecommendations.Any(
-                    recommendation =>
-                        recommendation.PlayerCount == players));
+                game.MinPlayers <= players.Value &&
+                game.MaxPlayers >= players.Value);
         }
 
         return await query
             .OrderBy(game => game.Title)
-            .ThenBy(game => game.BggId)
+            .ThenBy(game => game.Id)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<BoardGame> AddAsync(
-        int bggId,
+        CreateBoardGameRequest request,
         CancellationToken cancellationToken)
     {
-        var existing = await dbContext.BoardGames
-            .AnyAsync(
-                game => game.BggId == bggId,
-                cancellationToken);
-
-        if (existing)
+        var game = new BoardGame
         {
-            throw new InvalidOperationException(
-                "A board game with this BGG ID already exists.");
-        }
-
-        var game = await bggClient.GetBoardGameAsync(
-            bggId,
-            cancellationToken);
-
-        if (game is null)
-        {
-            throw new KeyNotFoundException(
-                "The requested BoardGameGeek game was not found.");
-        }
+            Title = request.Title!.Trim(),
+            MinPlayers = request.MinPlayers,
+            MaxPlayers = request.MaxPlayers,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
 
         dbContext.BoardGames.Add(game);
-
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return game;
