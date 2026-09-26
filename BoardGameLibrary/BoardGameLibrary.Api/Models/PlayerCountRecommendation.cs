@@ -4,7 +4,6 @@ namespace BoardGameLibrary.Api.Models;
 
 public class PlayerCountRecommendation
 {
-    public int Id { get; set; }
     public string PlayerCount { get; set; } = string.Empty;
     public int BestVotes { get; set; }
     public int RecommendedVotes { get; set; }

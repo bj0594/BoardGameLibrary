@@ -14,6 +14,10 @@ public class BoardGameDbContext(DbContextOptions<BoardGameDbContext> options) : 
             .HasKey(game => game.BggId);
 
         modelBuilder.Entity<BoardGame>()
+            .Property(game => game.BggId)
+            .ValueGeneratedNever();
+
+        modelBuilder.Entity<BoardGame>()
             .Property(game => game.Title)
             .IsRequired();
 
@@ -24,11 +28,10 @@ public class BoardGameDbContext(DbContextOptions<BoardGameDbContext> options) : 
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<PlayerCountRecommendation>()
-            .HasIndex(recommendation => new
+            .HasKey(recommendation => new
             {
                 recommendation.BoardGameId,
                 recommendation.PlayerCount
-            })
-            .IsUnique();
+            });
     }
 }
