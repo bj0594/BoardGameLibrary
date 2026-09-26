@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Xml;
 using System.Xml.Linq;
 using BoardGameLibrary.Api.Models;
 
@@ -42,7 +43,17 @@ public class BoardGameGeekClient(
         }
 
         var xml = await response.Content.ReadAsStringAsync(cancellationToken);
-        return ParseBoardGame(xml, bggId);
+
+        try
+        {
+            return ParseBoardGame(xml, bggId);
+        }
+        catch (XmlException exception)
+        {
+            throw new HttpRequestException(
+                "BoardGameGeek returned malformed XML.",
+                exception);
+        }
     }
 
     private static BoardGame? ParseBoardGame(

@@ -20,6 +20,14 @@ builder.Services.AddHttpClient<IBoardGameGeekClient, BoardGameGeekClient>(client
 
 builder.Services.AddScoped<BoardGameService>();
 
+if (!builder.Environment.IsEnvironment("Testing") &&
+    string.IsNullOrWhiteSpace(
+        builder.Configuration["BoardGameGeek:AuthorizationToken"]))
+{
+    throw new InvalidOperationException(
+        "BoardGameGeek authorization is required. Configure BoardGameGeek:AuthorizationToken locally.");
+}
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -42,4 +50,7 @@ app.MapControllers();
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    
+}

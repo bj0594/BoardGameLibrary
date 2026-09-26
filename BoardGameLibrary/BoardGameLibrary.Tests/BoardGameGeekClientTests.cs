@@ -92,6 +92,27 @@ public class BoardGameGeekClientTests
     }
 
     [Fact]
+    public async Task GetBoardGame_WhenBggReturnsMalformedXml_ThrowsHttpRequestException()
+    {
+        const string malformedXml = "<items><item>";
+
+        using var client = new HttpClient(new StubHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(malformedXml, Encoding.UTF8, "application/xml")
+            }))
+        {
+            BaseAddress = new Uri("https://example.test/")
+        };
+
+        var configuration = new ConfigurationBuilder().Build();
+        var sut = new BoardGameGeekClient(client, configuration);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => sut.GetBoardGameAsync(12345));
+    }
+
+    [Fact]
     public async Task GetBoardGame_WhenBggReturnsNotFound_ReturnsNull()
     {
         using var client = new HttpClient(new StubHandler(

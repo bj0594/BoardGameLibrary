@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using BoardGameLibrary.Api.Data;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,11 @@ public class ValidationTests
             new { BggId = 0 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(document.RootElement.TryGetProperty("errors", out var errors));
+        Assert.True(errors.TryGetProperty("BggId", out _));
         Assert.Equal(0, factory.FakeBggClient.CallCount);
 
         using var scope = factory.Services.CreateScope();
