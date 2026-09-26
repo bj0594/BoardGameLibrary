@@ -37,10 +37,6 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-    await dbContext.Database.MigrateAsync();
-
     app.UseHttpsRedirection();
 }
 
