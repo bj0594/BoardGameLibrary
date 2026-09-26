@@ -1,3 +1,4 @@
+<!-- API project: ASP.NET Core Controllers, EF Core/SQLite persistence, built-in OpenAPI generation, and development-only Swagger UI. -->
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>

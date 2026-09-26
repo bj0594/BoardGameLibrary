@@ -1,3 +1,4 @@
+<!-- Solution root: keeps the API and automated test project together for restore, build, and test commands. -->
 <Solution>
   <Project Path="BoardGameLibrary.Api/BoardGameLibrary.Api.csproj" />
   <Project Path="BoardGameLibrary.Tests/BoardGameLibrary.Tests.csproj" />

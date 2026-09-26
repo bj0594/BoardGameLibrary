@@ -6,9 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
+/// <summary>Verifies read-only collection and single-resource GET behaviour.</summary>
 public class GetBoardGamesTests
 {
     [Fact]
+    // Ordering is explicit in the API contract so clients receive deterministic results.
     public async Task GetAll_WithStoredGames_ReturnsAllGamesInStableOrder()
     {
         using var factory = new BoardGameApiFactory();
@@ -39,6 +41,7 @@ public class GetBoardGamesTests
     }
 
     [Fact]
+    // A collection endpoint should represent an empty resource collection with 200, not 404.
     public async Task GetAll_WhenEmpty_ReturnsEmptyCollection()
     {
         using var factory = new BoardGameApiFactory();
@@ -54,6 +57,7 @@ public class GetBoardGamesTests
     }
 
     [Fact]
+    // Proves a known identifier returns the complete persisted resource.
     public async Task GetById_WhenGameExists_ReturnsGame()
     {
         using var factory = new BoardGameApiFactory();
@@ -78,6 +82,7 @@ public class GetBoardGamesTests
     }
 
     [Fact]
+    // A missing single resource is a resource-level 404 rather than a collection-level empty result.
     public async Task GetById_WhenGameDoesNotExist_ReturnsNotFound()
     {
         using var factory = new BoardGameApiFactory();
@@ -92,6 +97,7 @@ public class GetBoardGamesTests
         BoardGameApiFactory factory,
         BoardGame game)
     {
+        // Seed directly through EF so GET tests focus on retrieval rather than also testing POST.
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
         dbContext.BoardGames.Add(game);

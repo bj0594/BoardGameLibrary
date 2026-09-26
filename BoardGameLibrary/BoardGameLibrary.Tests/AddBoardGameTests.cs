@@ -6,20 +6,16 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
+/// <summary>Verifies successful resource creation, persistence, and REST creation semantics.</summary>
+public class AddBoardGameTests
 {
-    private readonly HttpClient client;
-    private readonly BoardGameApiFactory factory;
-
-    public AddBoardGameTests(BoardGameApiFactory factory)
-    {
-        this.factory = factory;
-        client = factory.CreateClient();
-    }
-
     [Fact]
+    // Proves the complete POST -> validation -> service -> EF Core -> SQLite path.
     public async Task CreateValidGame_PersistsAndReturnsCreated()
     {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
         var request = new CreateBoardGameRequest
         {
             Title = "Test Game",
@@ -39,7 +35,7 @@ public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
         Assert.Equal("Test Game", createdGame.Title);
         Assert.Equal(1, createdGame.MinPlayers);
         Assert.Equal(4, createdGame.MaxPlayers);
-        Assert.True(createdGame.CreatedAt > DateTimeOffset.MinValue);
+        Assert.Equal(TimeSpan.Zero, createdGame.CreatedAt.Offset);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
@@ -50,8 +46,12 @@ public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
     }
 
     [Fact]
+    // CreatedAtAction must point to an actually retrievable resource, not merely contain a plausible URL.
     public async Task CreateValidGame_LocationPointsToCreatedResource()
     {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
         var response = await client.PostAsJsonAsync(
             "/api/games",
             new
@@ -67,6 +67,13 @@ public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
         var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
 
         Assert.NotNull(createdGame);
-        Assert.Contains($"/api/games/{createdGame!.Id}", response.Headers.Location!.ToString());
+
+        var getResponse = await client.GetAsync(response.Headers.Location);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var retrievedGame = await getResponse.Content.ReadFromJsonAsync<BoardGame>();
+        Assert.NotNull(retrievedGame);
+        Assert.Equal(createdGame!.Id, retrievedGame!.Id);
+        Assert.Equal(createdGame.Title, retrievedGame.Title);
     }
 }

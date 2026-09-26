@@ -10,10 +10,14 @@ using Microsoft.Extensions.Hosting;
 
 namespace BoardGameLibrary.Tests;
 
+/// <summary>
+/// Creates a real API host backed by one isolated in-memory SQLite database per factory instance.
+/// </summary>
 public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection connection = new("Data Source=:memory:");
 
+    /// <summary>Replaces the production database registration with the isolated test database.</summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -29,6 +33,9 @@ public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
         });
     }
 
+    /// <summary>
+    /// Creates the schema once the test host is ready. This is test-only setup, not application startup logic.
+    /// </summary>
     protected override IHost CreateHost(IHostBuilder builder)
     {
         var host = base.CreateHost(builder);
@@ -40,11 +47,15 @@ public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
         return host;
     }
 
+    /// <summary>
+    /// Deliberately breaks the shared test connection so failure-handling tests can exercise a database error.
+    /// </summary>
     public void BreakDatabaseConnection()
     {
         connection.Dispose();
     }
 
+    /// <summary>Releases the test database connection after the factory is disposed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
