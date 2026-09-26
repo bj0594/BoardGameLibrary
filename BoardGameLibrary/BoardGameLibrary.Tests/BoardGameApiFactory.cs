@@ -7,14 +7,16 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BoardGameLibrary.Tests;
 
 public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection connection = new("Data Source=:memory:");
+
+    public FakeBoardGameGeekClient FakeBggClient { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -23,13 +25,13 @@ public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<BoardGameDbContext>>();
-            services.RemoveAll<DbConnection>();
             services.RemoveAll<IBoardGameGeekClient>();
 
             connection.Open();
+
             services.AddSingleton<DbConnection>(connection);
             services.AddDbContext<BoardGameDbContext>(options => options.UseSqlite(connection));
-            services.AddScoped<IBoardGameGeekClient, FakeBoardGameGeekClient>();
+            services.AddSingleton<IBoardGameGeekClient>(FakeBggClient);
         });
     }
 
@@ -44,6 +46,11 @@ public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
         return host;
     }
 
+    public void BreakDatabaseConnection()
+    {
+        connection.Dispose();
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -55,13 +62,36 @@ public sealed class BoardGameApiFactory : WebApplicationFactory<Program>
     }
 }
 
+public enum FakeBggFailureMode
+{
+    None,
+    NotFound,
+    HttpRequestException
+}
+
 public sealed class FakeBoardGameGeekClient : IBoardGameGeekClient
 {
+    public FakeBggFailureMode FailureMode { get; set; }
+
+    public int CallCount { get; private set; }
+
     public Task<BoardGame?> GetBoardGameAsync(
         int bggId,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<BoardGame?>(new BoardGame
+        CallCount++;
+
+        return FailureMode switch
+        {
+            FakeBggFailureMode.NotFound => Task.FromResult<BoardGame?>(null),
+            FakeBggFailureMode.HttpRequestException => throw new HttpRequestException("Controlled BGG failure."),
+            _ => Task.FromResult<BoardGame?>(CreateGame(bggId))
+        };
+    }
+
+    private static BoardGame CreateGame(int bggId)
+    {
+        return new BoardGame
         {
             BggId = bggId,
             Title = "Test Game",
@@ -77,8 +107,15 @@ public sealed class FakeBoardGameGeekClient : IBoardGameGeekClient
                     BestVotes = 20,
                     RecommendedVotes = 15,
                     NotRecommendedVotes = 5
+                },
+                new PlayerCountRecommendation
+                {
+                    PlayerCount = "2",
+                    BestVotes = 30,
+                    RecommendedVotes = 20,
+                    NotRecommendedVotes = 2
                 }
             ]
-        });
+        };
     }
 }

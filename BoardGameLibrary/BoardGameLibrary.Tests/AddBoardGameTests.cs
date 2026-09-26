@@ -7,31 +7,23 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
 
-public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
+public class AddBoardGameTests
 {
-    private readonly HttpClient client;
-    private readonly BoardGameApiFactory factory;
-
-    public AddBoardGameTests(BoardGameApiFactory factory)
-    {
-        this.factory = factory;
-        client = factory.CreateClient();
-    }
-
     [Fact]
     public async Task CreateValidGame_PersistsEnrichedResourceAndReturnsCreated()
     {
-        // Arrange
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
         var request = new CreateBoardGameRequest
         {
             BggId = 12345
         };
 
-        // Act
         var response = await client.PostAsJsonAsync("/api/games", request);
 
-        // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal("/api/games/12345", response.Headers.Location?.AbsolutePath);
 
         var createdGame = await response.Content.ReadFromJsonAsync<BoardGame>();
 
@@ -44,13 +36,15 @@ public class AddBoardGameTests : IClassFixture<BoardGameApiFactory>
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
 
-        var persistedGame = await dbContext.BoardGames.FindAsync(12345);
+        var persistedGame = await dbContext.BoardGames
+            .Include(game => game.PlayerCountRecommendations)
+            .SingleOrDefaultAsync(game => game.BggId == 12345);
+
         Assert.NotNull(persistedGame);
         Assert.Equal("Test Game", persistedGame!.Title);
+        Assert.Single(persistedGame.PlayerCountRecommendations);
 
-        var persistedRecommendation = await dbContext.PlayerCountRecommendations
-            .SingleAsync(recommendation => recommendation.BoardGameId == 12345);
-
+        var persistedRecommendation = persistedGame.PlayerCountRecommendations.Single();
         Assert.Equal("1", persistedRecommendation.PlayerCount);
         Assert.Equal(20, persistedRecommendation.BestVotes);
         Assert.Equal(15, persistedRecommendation.RecommendedVotes);
