@@ -2,85 +2,93 @@
 
 ## 1. Verification strategy
 
-The automated suite is intended to prove the functional MVP. It tests the API through HTTP with an isolated SQLite test database. Internal implementation details are only inspected where behaviour alone cannot prove the requirement, especially async/non-blocking design.
+The automated suite is the executable MVP contract. Tests run the real Controller → Service → EF Core pipeline against isolated SQLite in-memory databases.
 
-The target is not maximum test count. The target is sufficient behavioural coverage that a green suite establishes the planned MVP behaviour.
+The goal is sufficient behavioural coverage, not maximum test count.
 
-## 2. Behaviour coverage
+## 2. Automated coverage
 
-### T01 — Add game
-- Valid request returns `201 Created`.
-- Created resource is returned.
-- `Location` points to the created resource.
-- Resource is persisted with the expected fields.
+### Create and persistence
+- Valid POST returns `201 Created`.
+- Created resource contains the requested data.
+- Player-count ratings are persisted.
+- `Location` points to a retrievable resource.
 
-### T02 — Retrieve games
-- Collection returns stored games in stable order.
-- Empty collection returns `200` with an empty list.
-- Single resource returns `200` when found.
-- Missing resource returns `404`.
+### Retrieval
+- Collection returns stored resources in stable default order.
+- Empty collection returns `200` with an empty array.
+- GET by ID returns a stored game.
+- GET by ID can expose the selected player-count rating.
+- Missing resources return `404`.
 
-### T03 — Player-count discovery
-- `players=1` returns only games supporting one player.
-- `players=2` returns only games supporting two players.
-- Valid query with no matches returns an empty collection.
-- Zero, negative, and non-numeric values return `400`.
+### Player-count discovery
+- Compatible games are returned.
+- Incompatible games are excluded.
+- Minimum/maximum player boundaries work.
+- The selected player-count rating changes with `players`.
+- No matches returns an empty collection.
 
-### T04 — Validation
-- Missing title returns `400` with useful validation feedback.
-- Blank title returns `400`.
-- Zero minimum players returns `400`.
-- Zero maximum players returns `400`.
-- `MinPlayers > MaxPlayers` returns `400`.
-- JSON `null` request body returns `400`.
-- Non-positive resource ID returns `400` and does not mutate state.
+### Filtering and sorting
+- `maxMinutes` excludes games whose maximum play time is too long.
+- Combined player/time filtering works.
+- `sort=rating` orders matching games by the selected player-count rating.
+- `sort=playtime` orders by maximum play time.
+- `sort=rating` without `players` returns `400`.
 
-### T05 — Persistence failure
+### Validation
+- Missing or blank title.
+- Invalid player range.
+- Invalid play-time range.
+- Title over 200 characters.
+- Invalid player-count rating.
+- Player-count rating outside the game's player range.
+- Duplicate player-count ratings.
+- Null JSON body.
+- Invalid resource ID.
+- Invalid `players` query.
+- Invalid `maxMinutes` query.
+- Invalid `sort` query.
+- Invalid POST requests do not persist state.
+
+### Failure handling
 - GET database failure returns `500`.
 - POST database failure returns `500`.
 
-## 3. Test level
+## 3. Integration level
 
-All listed T-cases are API/integration tests using:
+All functional tests are API/integration tests using:
 
-- `WebApplicationFactory<Program>`.
-- isolated SQLite in-memory database per test factory.
-- real Controller and Service pipeline.
-
-No live external service is required for the MVP.
+- `WebApplicationFactory<Program>`;
+- isolated SQLite in-memory database;
+- the real Controller and Service pipeline;
+- no live external dependency.
 
 ## 4. Non-automated evidence
 
 ### I01 — Async I/O inspection
-Verify the Controller → Service → EF Core path uses async APIs and contains no `.Result`, `.Wait()`, or equivalent blocking calls.
+Verify EF Core access uses async APIs and there are no blocking `.Result`, `.Wait()`, or equivalent calls.
 
 ### I02 — Controller responsibility inspection
-Verify Controllers remain focused on HTTP concerns and do not contain EF Core/database implementation.
+Verify Controllers remain HTTP-focused and do not contain EF Core implementation.
 
-### M01 — Manual add
-Use the running API and submit a valid POST.
+### M01 — Manual library browse
+Use Swagger to view the seeded development library.
 
-### M02 — Manual retrieval
-Use GET collection and GET by ID.
+### M02 — Manual player-count discovery
+Try a few `players` values and confirm the selected rating changes accordingly.
 
-### M03 — Manual player filtering
-Use `players=1` and another positive player count.
+### M03 — Manual constrained discovery
+Use a combined query such as `players=4&maxMinutes=90&sort=rating`.
 
-### M04 — Manual validation
-Submit an invalid request and verify the documented `400` response.
+### M04 — Manual POST and validation
+Create a valid game and submit an invalid request.
 
 ### DOC01 — README
-Confirm the README accurately documents setup, migrations, running, endpoint usage, and testing.
+Confirm setup, migrations, Swagger, endpoint examples, seed behaviour, and testing instructions match the project.
 
 ### DOC02 — Delivery
-Confirm the required repository and Canvas delivery are complete.
+Confirm repository and Canvas delivery are complete.
 
 ## 5. Completion gate
 
-The MVP verification gate passes when:
-- all automated T-cases pass;
-- `dotnet build` passes;
-- the current EF Core migration has been generated/applied successfully;
-- M01–M04 are performed successfully;
-- I01–I02 are reviewed;
-- README and delivery evidence are complete.
+The gate passes when the automated suite and build are green, the latest migration is applied, Swagger and the main discovery flows have been manually verified, async/controller inspections are complete, and README/delivery evidence is current.
