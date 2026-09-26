@@ -94,6 +94,26 @@ public class PlayerCountDiscoveryTests
     }
 
     [Fact]
+    public async Task GetByPlayerCount_WithWhitespaceRatingSort_NormalizesInput()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Lower Rated", 2, 4, 30, 60,
+            (2, 8.0m), (3, 8.1m), (4, 7.8m)));
+        await SeedAsync(factory, Game("Higher Rated", 2, 4, 30, 60,
+            (2, 8.2m), (3, 8.9m), (4, 8.6m)));
+
+        var response = await client.GetAsync("/api/games?players=3&sort=%20rating%20");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        Assert.Equal("Higher Rated", games![0].Title);
+        Assert.Equal(8.9m, games[0].SelectedPlayerRating);
+    }
+
+    [Fact]
     public async Task GetByPlayerCount_WithMaxMinutes_ExcludesGamesThatTakeTooLong()
     {
         using var factory = new BoardGameApiFactory();

@@ -32,6 +32,7 @@ Course evaluator and portfolio visitors.
 - Maximum play-time filtering.
 - Sorting by title, play time, or player-count rating.
 - Development seed data for immediate demonstration.
+- Development startup applies EF Core migrations automatically before seeding.
 - OpenAPI + Swagger UI for interactive verification.
 
 ## 1. Direction
@@ -80,7 +81,7 @@ Validation includes:
 - required/non-blank title;
 - supported player range;
 - play-time range;
-- rating range 0–10;
+- rating range 0–10 with at most one decimal place;
 - unique player-count ratings;
 - player-count ratings inside the supported player range.
 
@@ -120,7 +121,7 @@ Invalid POST data and invalid query values return clear `400` responses without 
 Relevant database failures return safe `500` responses without exposing internal details.
 
 ### B07 — Provide immediate demo data
-Development startup seeds ten real game records when the local database is empty. Existing data is never overwritten.
+Development startup applies the committed migrations and then seeds ten real game records when the local database is empty. Existing data is never overwritten.
 
 ## 5. Design responsibilities
 
@@ -155,6 +156,7 @@ Before delivery:
 - [ ] Automated test suite is green.
 - [ ] `dotnet build` is green.
 - [ ] Latest EF Core migration has been generated and applied.
+- [ ] Development startup successfully applies pending migrations before seeding.
 - [ ] Swagger opens from the Development root.
 - [ ] GET discovery scenarios have been manually verified.
 - [ ] POST and validation have been manually verified.

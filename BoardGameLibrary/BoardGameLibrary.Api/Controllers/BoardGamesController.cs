@@ -12,10 +12,17 @@ namespace BoardGameLibrary.Api.Controllers;
 public class BoardGamesController(BoardGameService boardGameService) : ControllerBase
 {
     /// <summary>Returns the library, optionally filtered and sorted for a specific use case.</summary>
+    /// <param name="players">Optional player count used for compatibility filtering and player-specific rating.</param>
+    /// <param name="maxMinutes">Optional maximum play-time limit.</param>
+    /// <param name="sort">Optional sort: title, rating, or playtime.</param>
+    /// <param name="cancellationToken">Request cancellation token.</param>
+    /// <response code="200">Returns matching board games.</response>
+    /// <response code="400">The query parameters are invalid or rating sorting is missing players.</response>
+    /// <response code="500">A database operation failed.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<BoardGame>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<BoardGame>>> GetAll(
         [FromQuery] int? players,
         [FromQuery] int? maxMinutes,
@@ -38,7 +45,11 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
                 detail: "The maxMinutes query parameter must be greater than zero.");
         }
 
-        if (string.Equals(sort, "rating", StringComparison.OrdinalIgnoreCase) && !players.HasValue)
+        var normalizedSort = string.IsNullOrWhiteSpace(sort)
+            ? null
+            : sort.Trim();
+
+        if (string.Equals(normalizedSort, "rating", StringComparison.OrdinalIgnoreCase) && !players.HasValue)
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -46,7 +57,7 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
                 detail: "Provide the players query parameter when sorting by player-count rating.");
         }
 
-        if (!IsSupportedSort(sort))
+        if (!IsSupportedSort(normalizedSort))
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -59,7 +70,7 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
             return Ok(await boardGameService.GetAllAsync(
                 players,
                 maxMinutes,
-                sort,
+                normalizedSort,
                 cancellationToken));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -71,11 +82,18 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
     }
 
     /// <summary>Returns one game and, when requested, its rating for a selected player count.</summary>
+    /// <param name="id">Local board-game identifier.</param>
+    /// <param name="players">Optional player count used to select a local rating.</param>
+    /// <param name="cancellationToken">Request cancellation token.</param>
+    /// <response code="200">Returns the requested board game.</response>
+    /// <response code="400">The route ID or player count is invalid.</response>
+    /// <response code="404">No board game exists with the requested ID.</response>
+    /// <response code="500">A database operation failed.</response>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(BoardGame), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BoardGame>> GetById(
         int id,
         [FromQuery] int? players,
@@ -108,10 +126,15 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
     }
 
     /// <summary>Creates a local board game with optional player-count-specific ratings.</summary>
+    /// <param name="request">Board-game data and optional player-count-specific ratings.</param>
+    /// <param name="cancellationToken">Request cancellation token.</param>
+    /// <response code="201">Returns the created game and a Location header for the new resource.</response>
+    /// <response code="400">The request body or its values are invalid.</response>
+    /// <response code="500">The board game could not be persisted.</response>
     [HttpPost]
     [ProducesResponseType(typeof(BoardGame), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BoardGame>> Create(
         CreateBoardGameRequest? request,
         CancellationToken cancellationToken)

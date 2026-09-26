@@ -130,6 +130,28 @@ public class ValidationTests
     }
 
     [Fact]
+    public async Task Create_WithPlayerRatingUsingMoreThanOneDecimalPlace_ReturnsBadRequest()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/games", new
+        {
+            title = "Rating Precision Test",
+            minPlayers = 1,
+            maxPlayers = 4,
+            minPlayTimeMinutes = 30,
+            maxPlayTimeMinutes = 60,
+            playerRatings = new[]
+            {
+                new { playerCount = 2, rating = 8.37m }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_WithPlayerRatingOutsideSupportedRange_ReturnsBadRequest()
     {
         using var factory = new BoardGameApiFactory();
@@ -257,6 +279,17 @@ public class ValidationTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+
+    [Fact]
+    public async Task GetAll_WithWhitespaceRatingSortWithoutPlayers_ReturnsBadRequest()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/games?sort=%20rating%20");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 
     [Fact]
     public async Task GetAll_WithInvalidSort_ReturnsBadRequest()

@@ -29,7 +29,14 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/openapi/v1.json", "BoardGame Library API v1");
     });
 
-    // The demo database is populated only when it is empty, so normal user data is never overwritten.
+    // Development startup prepares the local schema automatically.
+    // The demo database is then populated only when it is empty, so normal user data is never overwritten.
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
+
     await BoardGameSeeder.SeedAsync(app.Services);
 }
 

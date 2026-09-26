@@ -34,6 +34,8 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - `sort=rating` orders matching games by the selected player-count rating.
 - `sort=playtime` orders by maximum play time.
 - `sort=rating` without `players` returns `400`.
+- Whitespace around `sort=rating` is normalized consistently.
+
 
 ### Validation
 - Missing or blank title.
@@ -41,6 +43,7 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - Invalid play-time range.
 - Title over 200 characters.
 - Invalid player-count rating.
+- Player-count rating with more than one decimal place.
 - Player-count rating outside the game's player range.
 - Duplicate player-count ratings.
 - Null JSON body.
@@ -49,6 +52,11 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - Invalid `maxMinutes` query.
 - Invalid `sort` query.
 - Invalid POST requests do not persist state.
+
+### Seed behaviour
+- Development seed creates exactly ten demonstration games.
+- Running the seed twice does not create duplicates.
+- Seeded games contain player-count ratings.
 
 ### Failure handling
 - GET database failure returns `500`.
@@ -82,6 +90,9 @@ Use a combined query such as `players=4&maxMinutes=90&sort=rating`.
 
 ### M04 — Manual POST and validation
 Create a valid game and submit an invalid request.
+
+### M05 — Swagger contract
+Confirm the generated OpenAPI document describes the endpoint summaries, parameters, and ProblemDetails error responses.
 
 ### DOC01 — README
 Confirm setup, migrations, Swagger, endpoint examples, seed behaviour, and testing instructions match the project.

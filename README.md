@@ -10,9 +10,27 @@ The core question is:
 
 > Which games in my library are the best fit for the number of people I have and the time available?
 
-The API therefore supports player-count filtering, maximum play-time filtering, and sorting by the local rating for the selected player count.
+The API supports player-count filtering, maximum play-time filtering, and sorting by the local rating for the selected player count. A game can be rated differently for different player counts.
 
-A game can be rated differently for different player counts. For example, the same game can be rated 8.1 for two players and 9.2 for four players. When `players=4` is selected, the response exposes the four-player rating.
+When `players=4` is selected, for example, the response exposes the four-player rating as `selectedPlayerRating`. This makes the ranking meaningful for the actual group rather than relying only on a single global rating.
+
+## Quick demo
+
+1. Start the API from the solution directory:
+
+       dotnet run --project BoardGameLibrary.Api
+
+2. Open Swagger UI:
+
+       http://localhost:5006/
+
+3. Try this request:
+
+       GET /api/games?players=4&maxMinutes=90&sort=rating
+
+4. Inspect `selectedPlayerCount` and `selectedPlayerRating` in the results.
+
+The Development environment automatically applies the committed EF Core migrations and seeds a ten-game demonstration library when the local database is empty. Existing data is never replaced.
 
 ## How to run
 
@@ -25,18 +43,15 @@ Requirements:
 From the `BoardGameLibrary` solution directory:
 
     dotnet restore
-    dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
     dotnet run --project BoardGameLibrary.Api
 
-The repository contains the current baseline migration. Do not create a new migration just to run the project. If you have a local `boardgamelibrary.db` created by an older version of the project, delete that file once before running `dotnet ef database update`.
+For manual EF Core schema management, the committed migrations can also be applied explicitly:
 
-In Development, the application seeds a demonstration library of ten games when the database is empty. Existing data is never replaced by the seeder.
+    dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
 
-The Development root opens Swagger UI at:
+The repository contains the current migration history. Do not create a new migration just to run the project. If you have a local `boardgamelibrary.db` created by an older version of the project, delete that file once before starting so the current migrations can rebuild the schema cleanly.
 
-    http://localhost:5006/
-
-The launch settings also support HTTPS on the configured HTTPS port.
+The Development root opens Swagger UI at `http://localhost:5006/`. The launch settings also support HTTPS on the configured HTTPS port.
 
 ## API surface
 
@@ -60,7 +75,7 @@ The project intentionally keeps the HTTP surface to GET and POST, as required by
 - `rating` — highest rating for the selected `players` value first.
 - `playtime` — shortest maximum play time first.
 
-`sort=rating` requires `players`, because a rating is specific to a player count.
+`sort=rating` requires `players`, because the rating is specific to a player count.
 
 A representative request is:
 
@@ -72,7 +87,7 @@ The response includes `selectedPlayerCount` and `selectedPlayerRating` so the re
 
     GET /api/games/1?players=3
 
-The response includes the game's stored player-count ratings and identifies the selected three-player rating.
+The response includes the stored player-count ratings and identifies the selected three-player rating.
 
 ### POST example
 
@@ -94,27 +109,34 @@ The response includes the game's stored player-count ratings and identifies the 
 
 Successful creation returns `201 Created`, the created resource, and a `Location` header pointing to the new resource.
 
+### Validation and errors
+
+Invalid input returns an RFC 7807-style `ProblemDetails` response with HTTP `400`. Not-found resources return `404`, and unexpected persistence failures are exposed as safe `500` responses without internal exception details.
+
 ## Seed data and BGG provenance
 
 The Development seed contains ten real board games and a snapshot of BGG metadata: BGG ID, title, player range, play-time range, average rating, and community best-with information.
 
-The stored BGG fields are static snapshot data; the running application does not call BGG and therefore does not require BGG credentials.
+The stored BGG fields are static snapshot data captured at import time. They can become outdated as BoardGameGeek changes its data; the running application does not call BGG and therefore does not require BGG credentials. Refreshing the snapshot is an intentional data-maintenance step rather than a runtime dependency.
 
-The per-player-count `PlayerCountRating` values are deliberately local demo/library ratings. They are not presented as official BGG ratings. This distinction keeps source data and local user judgement separate.
+The per-player-count `PlayerCountRating` values are deliberately local demo/library ratings. They are not presented as official BGG ratings. This keeps source data and local judgement separate.
 
-The seed source URLs are stored alongside the BGG metadata so the snapshot can be reviewed or refreshed deliberately rather than silently changing at runtime. BoardGameGeek is credited as the source of the imported snapshot data; see the current [BGG XML API Terms of Use](https://boardgamegeek.com/wiki/page/XML%20API%20Terms%20of%20Use) before reusing or redistributing the data in another context.
+The seed source URLs are stored alongside the BGG metadata so the snapshot can be reviewed or refreshed deliberately. BoardGameGeek is credited as the source of the imported snapshot data; see the current [BGG XML API Terms of Use](https://boardgamegeek.com/wiki/page/XML%20API%20Terms%20of%20Use) before reusing or redistributing the data in another context.
 
 ## Database
 
-Production/local development uses SQLite with EF Core migrations.
+Local development uses SQLite with EF Core migrations. The Development startup applies those migrations automatically before seeding.
 
-The repository contains the initial migration. Schema changes should be made by generating a new migration and applying it with `dotnet ef database update`.
+Schema changes should still be made through normal EF Core migration workflow:
 
-Tests use a separate SQLite in-memory connection, so tests never depend on the developer's local database.
+    dotnet ef migrations add <MigrationName> --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+    dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+
+Tests use a separate SQLite in-memory connection, so they never depend on the developer's local database.
 
 ## Testing
 
-Run the complete automated API suite:
+Run the complete automated API suite from the solution directory:
 
     dotnet test
 
@@ -122,7 +144,7 @@ Build the solution:
 
     dotnet build
 
-The tests exercise the real Controller → Service → EF Core pipeline and cover creation, retrieval, player-count discovery, player-count-specific ratings, play-time filtering, sorting, validation, and database failure handling.
+The tests exercise the real Controller → Service → EF Core pipeline and cover creation, retrieval, player-count discovery, player-count-specific ratings, play-time filtering, sorting, validation, seed idempotency, and database failure handling.
 
 Manual verification can be performed through Swagger UI, the `.http` file, cURL, Postman, or another HTTP client.
 
@@ -135,7 +157,7 @@ Manual verification can be performed through Swagger UI, the `.http` file, cURL,
     │   ├── Model/
     │   ├── SeedData/
     │   ├── Services/
-    │   └── Migrations/           generated by EF Core
+    │   └── Migrations/
     ├── BoardGameLibrary.Tests/
     ├── Planning/
     └── README.md
@@ -146,19 +168,15 @@ Before delivery:
 
 - `dotnet test` passes.
 - `dotnet build` passes.
-- The current EF Core migrations are applied successfully.
+- The current EF Core migration chain applies to an empty database.
 - Swagger can be opened from the Development root.
 - GET collection, GET by ID, POST, filtering, sorting, and validation have been manually exercised.
+- The Development seed produces the demonstration library without replacing existing data.
 - The README matches the actual project.
-
-## Assignment delivery
-
-- Repository: `https://github.com/bj0594/BoardGameLibrary`
-- Submission: GitHub repository link in Canvas.
-- Deadline: 27 September 2026.
 
 ## Development workspace
 
-- `Planning/Planning.md` — project direction, requirements, scope, behaviour contracts, and decisions.
+- `Planning/Planning.md` — project direction, requirements, scope, decisions, behaviour contracts, and current design.
 - `Planning/TestPlan.md` — verification strategy and automated/manual test design.
 - Concrete test files — executable API behaviour.
+- Todoist, if used — work status only.
