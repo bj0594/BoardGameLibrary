@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using BoardGameLibrary.Api.Data;
 using BoardGameLibrary.Api.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BoardGameLibrary.Tests;
