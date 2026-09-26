@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text;
 using BoardGameLibrary.Api.Data;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -43,11 +45,20 @@ public class ValidationTests
     }
 
     [Fact]
-    public async Task CreateWithMissingRequestBody_ReturnsBadRequestAndDoesNotCallBgg()
+    public async Task CreateWithNullJsonBody_ReturnsBadRequestAndDoesNotCallBgg()
     {
         using var factory = new BoardGameApiFactory();
         using var client = factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/games");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/games")
+        {
+            Content = new StringContent(
+                "null",
+                Encoding.UTF8,
+                "application/json")
+        };
 
         var response = await client.SendAsync(request);
 

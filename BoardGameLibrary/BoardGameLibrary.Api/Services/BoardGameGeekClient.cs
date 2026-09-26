@@ -1,26 +1,36 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Xml.Linq;
 using BoardGameLibrary.Api.Models;
 
 namespace BoardGameLibrary.Api.Services;
 
-public class BoardGameGeekClient(HttpClient httpClient, IConfiguration configuration) : IBoardGameGeekClient
+public class BoardGameGeekClient(
+    HttpClient httpClient,
+    IConfiguration configuration) : IBoardGameGeekClient
 {
-    public async Task<BoardGame?> GetBoardGameAsync(int bggId, CancellationToken cancellationToken = default)
+    public async Task<BoardGame?> GetBoardGameAsync(
+        int bggId,
+        CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"xmlapi2/thing?id={bggId}&stats=1");
 
         var token = configuration["BoardGameGeek:AuthorizationToken"];
+
         if (!string.IsNullOrWhiteSpace(token))
         {
             request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                new AuthenticationHeaderValue("Bearer", token);
         }
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await httpClient.SendAsync(
+            request,
+            cancellationToken);
 
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
@@ -35,7 +45,9 @@ public class BoardGameGeekClient(HttpClient httpClient, IConfiguration configura
         return ParseBoardGame(xml, bggId);
     }
 
-    private static BoardGame? ParseBoardGame(string xml, int requestedBggId)
+    private static BoardGame? ParseBoardGame(
+        string xml,
+        int requestedBggId)
     {
         var document = XDocument.Parse(xml);
         var item = document.Root?.Element("item");
@@ -46,8 +58,10 @@ public class BoardGameGeekClient(HttpClient httpClient, IConfiguration configura
         }
 
         var title = item.Elements("name")
-            .FirstOrDefault(name => (string?)name.Attribute("type") == "primary")?
-            .Attribute("value")?.Value;
+            .FirstOrDefault(name =>
+                (string?)name.Attribute("type") == "primary")?
+            .Attribute("value")?
+            .Value;
 
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -58,56 +72,100 @@ public class BoardGameGeekClient(HttpClient httpClient, IConfiguration configura
         {
             BggId = (int?)item.Attribute("id") ?? requestedBggId,
             Title = title,
-            MinPlayers = GetIntAttribute(item.Element("minplayers"), "value"),
-            MaxPlayers = GetIntAttribute(item.Element("maxplayers"), "value")
+            MinPlayers = GetIntAttribute(
+                item.Element("minplayers"),
+                "value"),
+            MaxPlayers = GetIntAttribute(
+                item.Element("maxplayers"),
+                "value")
         };
 
         var ratings = item.Element("statistics")?.Element("ratings");
-        game.BggAverageRating = GetDoubleAttribute(ratings?.Element("average"), "value");
-        game.BggRatingCount = GetNullableIntAttribute(ratings?.Element("usersrated"), "value");
+
+        game.BggAverageRating = GetDoubleAttribute(
+            ratings?.Element("average"),
+            "value");
+
+        game.BggRatingCount = GetNullableIntAttribute(
+            ratings?.Element("usersrated"),
+            "value");
 
         var playerPoll = item.Elements("poll")
-            .FirstOrDefault(poll => (string?)poll.Attribute("name") == "suggested_numplayers");
+            .FirstOrDefault(poll =>
+                (string?)poll.Attribute("name") ==
+                "suggested_numplayers");
 
-        if (playerPoll is not null)
+        if (playerPoll is null)
         {
-            foreach (var results in playerPoll.Elements("results"))
-            {
-                var playerCountValue = (string?)results.Attribute("numplayers");
-                if (string.IsNullOrWhiteSpace(playerCountValue))
-                {
-                    continue;
-                }
+            return game;
+        }
 
-                var recommendation = new PlayerCountRecommendation
+        foreach (var results in playerPoll.Elements("results"))
+        {
+            var playerCountValue =
+                (string?)results.Attribute("numplayers");
+
+            if (string.IsNullOrWhiteSpace(playerCountValue))
+            {
+                continue;
+            }
+
+            game.PlayerCountRecommendations.Add(
+                new PlayerCountRecommendation
                 {
                     PlayerCount = playerCountValue,
                     BestVotes = GetPollVotes(results, "Best"),
-                    RecommendedVotes = GetPollVotes(results, "Recommended"),
-                    NotRecommendedVotes = GetPollVotes(results, "Not Recommended")
-                };
-
-                game.PlayerCountRecommendations.Add(recommendation);
-            }
+                    RecommendedVotes =
+                        GetPollVotes(results, "Recommended"),
+                    NotRecommendedVotes =
+                        GetPollVotes(results, "Not Recommended")
+                });
         }
 
         return game;
     }
 
-    private static int GetPollVotes(XElement results, string value)
+    private static int GetPollVotes(
+        XElement results,
+        string value)
     {
         var result = results.Elements("result")
-            .FirstOrDefault(element => (string?)element.Attribute("value") == value);
+            .FirstOrDefault(element =>
+                (string?)element.Attribute("value") == value);
 
         return GetIntAttribute(result, "numvotes");
     }
 
-    private static int GetIntAttribute(XElement? element, string attributeName)
-        => int.TryParse((string?)element?.Attribute(attributeName), out var value) ? value : 0;
+    private static int GetIntAttribute(
+        XElement? element,
+        string attributeName)
+        => int.TryParse(
+            (string?)element?.Attribute(attributeName),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
 
-    private static int? GetNullableIntAttribute(XElement? element, string attributeName)
-        => int.TryParse((string?)element?.Attribute(attributeName), out var value) ? value : null;
+    private static int? GetNullableIntAttribute(
+        XElement? element,
+        string attributeName)
+        => int.TryParse(
+            (string?)element?.Attribute(attributeName),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : null;
 
-    private static double? GetDoubleAttribute(XElement? element, string attributeName)
-        => double.TryParse((string?)element?.Attribute(attributeName), out var value) ? value : null;
+    private static double? GetDoubleAttribute(
+        XElement? element,
+        string attributeName)
+        => double.TryParse(
+            (string?)element?.Attribute(attributeName),
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : null;
 }

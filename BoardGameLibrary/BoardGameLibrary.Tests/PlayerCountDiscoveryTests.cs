@@ -100,6 +100,18 @@ public class PlayerCountDiscoveryTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+
+    [Fact]
+    public async Task GetByPlayerCount_WithNegativeValue_ReturnsBadRequest()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/games?players=-1");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task GetByPlayerCount_WithNonNumericValue_ReturnsBadRequest()
     {
