@@ -20,11 +20,10 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-}
-
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    app.UseHttpsRedirection();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "BoardGame Library API v1");
+    });
 }
 
 app.MapControllers();
