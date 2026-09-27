@@ -114,6 +114,24 @@ public class PlayerCountDiscoveryTests
     }
 
     [Fact]
+    public async Task GetByPlayerCount_WithRatingSort_PlacesMissingRatingsAfterRatedGames()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        await SeedAsync(factory, Game("Missing Rating", 2, 4, 30, 60, (2, 8.0m), (4, 8.0m)));
+        await SeedAsync(factory, Game("Rated", 2, 4, 30, 60, (2, 7.0m), (3, 8.5m), (4, 7.0m)));
+
+        var response = await client.GetAsync("/api/games?players=3&sort=rating");
+        var games = await response.Content.ReadFromJsonAsync<List<BoardGame>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(games);
+        Assert.Equal(["Rated", "Missing Rating"], games!.Select(game => game.Title));
+        Assert.Null(games[1].SelectedPlayerRating);
+    }
+
+    [Fact]
     public async Task GetByPlayerCount_WithMaxMinutes_ExcludesGamesThatTakeTooLong()
     {
         using var factory = new BoardGameApiFactory();
@@ -215,12 +233,12 @@ public class PlayerCountDiscoveryTests
         };
 
     private static async Task<int> SeedAsync(BoardGameApiFactory factory, BoardGame game)
-	{
-    		using var scope = factory.Services.CreateScope();
-    		var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
-    		dbContext.BoardGames.Add(game);
-    		await dbContext.SaveChangesAsync();
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BoardGameDbContext>();
+        dbContext.BoardGames.Add(game);
+        await dbContext.SaveChangesAsync();
 
-    		return game.Id;
-	}
+        return game.Id;
+    }
 }

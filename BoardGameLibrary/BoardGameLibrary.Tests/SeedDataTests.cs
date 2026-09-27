@@ -26,5 +26,15 @@ public class SeedDataTests
         Assert.Equal(10, games.Count);
         Assert.Equal(10, games.Select(game => game.BggId).Distinct().Count());
         Assert.All(games, game => Assert.NotEmpty(game.PlayerCountRatings));
+
+        Assert.All(games, game =>
+        {
+            Assert.All(game.PlayerCountRatings, rating =>
+            {
+                Assert.InRange(rating.PlayerCount, game.MinPlayers, game.MaxPlayers);
+                Assert.InRange(rating.Rating, 0m, 10m);
+                Assert.Equal(decimal.Round(rating.Rating, 1), rating.Rating);
+            });
+        });
     }
 }

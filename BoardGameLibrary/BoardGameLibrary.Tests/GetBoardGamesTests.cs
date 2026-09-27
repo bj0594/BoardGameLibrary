@@ -89,6 +89,32 @@ public class GetBoardGamesTests
     }
 
     [Fact]
+    public async Task GetById_WithUnsupportedPlayerCount_ReturnsBadRequest()
+    {
+        using var factory = new BoardGameApiFactory();
+        using var client = factory.CreateClient();
+
+        var id = await SeedAsync(factory, new BoardGame
+        {
+            Title = "Restricted Game",
+            MinPlayers = 2,
+            MaxPlayers = 4,
+            MinPlayTimeMinutes = 30,
+            MaxPlayTimeMinutes = 60,
+            CreatedAt = DateTimeOffset.UtcNow,
+            PlayerCountRatings =
+            [
+                new() { PlayerCount = 2, Rating = 8.0m },
+                new() { PlayerCount = 4, Rating = 9.0m }
+            ]
+        });
+
+        var response = await client.GetAsync($"/api/games/{id}?players=5");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetById_WhenGameDoesNotExist_ReturnsNotFound()
     {
         using var factory = new BoardGameApiFactory();

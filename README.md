@@ -87,7 +87,7 @@ The response includes `selectedPlayerCount` and `selectedPlayerRating` so the re
 
     GET /api/games/1?players=3
 
-The response includes the stored player-count ratings and identifies the selected three-player rating.
+The response includes the stored player-count ratings and identifies the selected three-player rating. If `players` is outside the game's supported range, the API returns `400 Bad Request`.
 
 ### POST example
 
@@ -111,7 +111,7 @@ Successful creation returns `201 Created`, the created resource, and a `Location
 
 ### Validation and errors
 
-Invalid input returns an RFC 7807-style `ProblemDetails` response with HTTP `400`. Not-found resources return `404`, and unexpected persistence failures are exposed as safe `500` responses without internal exception details.
+Invalid input returns an RFC 9457 `ProblemDetails` response with HTTP `400`. Not-found resources return `404`, and unexpected persistence failures are exposed as safe `500` responses without internal exception details.
 
 ## Seed data and BGG provenance
 
@@ -121,7 +121,7 @@ The stored BGG fields are static snapshot data captured at import time. They can
 
 The per-player-count `PlayerCountRating` values are deliberately local demo/library ratings. They are not presented as official BGG ratings. This keeps source data and local judgement separate.
 
-The seed source URLs are stored alongside the BGG metadata so the snapshot can be reviewed or refreshed deliberately. BoardGameGeek is credited as the source of the imported snapshot data; see the current [BGG XML API Terms of Use](https://boardgamegeek.com/wiki/page/XML%20API%20Terms%20of%20Use) before reusing or redistributing the data in another context.
+The seed source URLs are stored alongside the BGG metadata so the snapshot can be reviewed or refreshed deliberately. BoardGameGeek is credited as the source of the imported snapshot data. Review the current [BGG XML API Terms of Use](https://boardgamegeek.com/wiki/page/XML%20API%20Terms%20of%20Use) before reusing or redistributing BGG-sourced data in another context. Public-facing uses of BGG XML API data may have additional attribution requirements, including the current “Powered by BGG” requirement described by BGG.
 
 ## Database
 
@@ -179,4 +179,3 @@ Before delivery:
 - `Planning/Planning.md` — project direction, requirements, scope, decisions, behaviour contracts, and current design.
 - `Planning/TestPlan.md` — verification strategy and automated/manual test design.
 - Concrete test files — executable API behaviour.
-- Todoist, if used — work status only.

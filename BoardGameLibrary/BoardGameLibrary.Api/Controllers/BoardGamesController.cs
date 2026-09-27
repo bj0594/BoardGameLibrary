@@ -9,7 +9,9 @@ namespace BoardGameLibrary.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/games")]
-public class BoardGamesController(BoardGameService boardGameService) : ControllerBase
+public class BoardGamesController(
+    BoardGameService boardGameService,
+    ILogger<BoardGamesController> logger) : ControllerBase
 {
     /// <summary>Returns the library, optionally filtered and sorted for a specific use case.</summary>
     /// <param name="players">Optional player count used for compatibility filtering and player-specific rating.</param>
@@ -75,6 +77,7 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            logger.LogError(exception, "Database operation failed while retrieving the board-game library.");
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Database operation failed.");
@@ -86,7 +89,7 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
     /// <param name="players">Optional player count used to select a local rating.</param>
     /// <param name="cancellationToken">Request cancellation token.</param>
     /// <response code="200">Returns the requested board game.</response>
-    /// <response code="400">The route ID or player count is invalid.</response>
+    /// <response code="400">The route ID, player count, or selected player count is invalid for the requested game.</response>
     /// <response code="404">No board game exists with the requested ID.</response>
     /// <response code="500">A database operation failed.</response>
     [HttpGet("{id:int}")]
@@ -111,14 +114,27 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
         {
             var game = await boardGameService.GetAsync(id, players, cancellationToken);
 
-            return game is null
-                ? Problem(
+            if (game is null)
+            {
+                return Problem(
                     statusCode: StatusCodes.Status404NotFound,
-                    title: "Board game not found.")
-                : Ok(game);
+                    title: "Board game not found.");
+            }
+
+            if (players.HasValue &&
+                (players.Value < game.MinPlayers || players.Value > game.MaxPlayers))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Unsupported player count.",
+                    detail: $"This game supports {game.MinPlayers} to {game.MaxPlayers} players.");
+            }
+
+            return Ok(game);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            logger.LogError(exception, "Database operation failed while retrieving board game {BoardGameId}.", id);
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Database operation failed.");
@@ -158,6 +174,7 @@ public class BoardGamesController(BoardGameService boardGameService) : Controlle
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            logger.LogError(exception, "Board game could not be persisted.");
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
                 title: "Board game could not be persisted.");

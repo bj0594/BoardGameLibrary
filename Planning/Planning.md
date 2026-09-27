@@ -98,7 +98,7 @@ Optional query parameters:
 When `players` is supplied, each returned game exposes `selectedPlayerCount` and `selectedPlayerRating`.
 
 ### GET /api/games/{id}
-Returns one game. The optional `players` parameter selects the corresponding player-count rating in the response.
+Returns one game. The optional `players` parameter selects the corresponding player-count rating in the response. If `players` is outside the game's supported range, the endpoint returns `400 Bad Request`.
 
 ## 4. Behaviours
 
@@ -153,13 +153,13 @@ The local player-count ratings are demonstration/library data. They are not pres
 ## 8. Readiness gate
 
 Before delivery:
-- [ ] Automated test suite is green.
-- [ ] `dotnet build` is green.
-- [ ] Latest EF Core migration has been generated and applied.
-- [ ] Development startup successfully applies pending migrations before seeding.
-- [ ] Swagger opens from the Development root.
-- [ ] GET discovery scenarios have been manually verified.
-- [ ] POST and validation have been manually verified.
-- [ ] Async/non-blocking path has been inspected.
-- [ ] README matches the actual project.
+- [x] Automated test suite is green.
+- [x] `dotnet build` is green.
+- [x] Latest committed EF Core migration has been generated and applied.
+- [x] Development startup successfully applies pending migrations before seeding.
+- [x] Swagger opens from the Development root.
+- [x] GET discovery scenarios have been manually verified.
+- [x] POST and validation have been manually verified.
+- [x] Async/non-blocking path has been inspected.
+- [x] README matches the actual project.
 - [ ] GitHub/Canvas delivery is complete.

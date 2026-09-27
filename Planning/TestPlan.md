@@ -19,6 +19,7 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - Empty collection returns `200` with an empty array.
 - GET by ID returns a stored game.
 - GET by ID can expose the selected player-count rating.
+- GET by ID returns `400` when `players` is outside the game's supported range.
 - Missing resources return `404`.
 
 ### Player-count discovery
@@ -35,6 +36,7 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - `sort=playtime` orders by maximum play time.
 - `sort=rating` without `players` returns `400`.
 - Whitespace around `sort=rating` is normalized consistently.
+- Rating sorting places games without a selected rating after rated games.
 
 
 ### Validation
@@ -57,6 +59,7 @@ The goal is sufficient behavioural coverage, not maximum test count.
 - Development seed creates exactly ten demonstration games.
 - Running the seed twice does not create duplicates.
 - Seeded games contain player-count ratings.
+- Seeded player-count ratings stay inside each game's player range and rating bounds.
 
 ### Failure handling
 - GET database failure returns `500`.

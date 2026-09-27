@@ -2,5 +2,11 @@
 bin/
 obj/
 
+# Visual Studio / test output
+.vs/
+TestResults/
+
 # Local SQLite database
 *.db
+*.db-wal
+*.db-shm
