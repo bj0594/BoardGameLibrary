@@ -18,17 +18,25 @@ When `players=4` is selected, for example, the response exposes the four-player 
 
 1. From the repository root, enter the solution directory and start the API:
 
-       cd BoardGameLibrary
-       dotnet restore
-       dotnet run --project BoardGameLibrary.Api
+   ```
+   cd BoardGameLibrary
+
+   dotnet restore
+
+   dotnet run --project BoardGameLibrary.Api
+   ```
 
 2. Open Swagger UI:
 
-       http://localhost:5006/
+   ```
+   http://localhost:5006/
+   ```
 
 3. Try this request:
 
-       GET /api/games?players=4&maxMinutes=90&sort=rating
+   ```
+   GET /api/games?players=4&maxMinutes=90&sort=rating
+   ```
 
 4. Inspect `selectedPlayerCount` and `selectedPlayerRating` in the results.
 
@@ -38,19 +46,25 @@ The Development environment automatically applies the committed EF Core migratio
 
 Requirements:
 
-- .NET 10 SDK
-- No external service, API account, or API key at runtime
-- SQLite database managed through EF Core migrations
+* .NET 10 SDK
+* No external service, API account, or API key at runtime
+* SQLite database managed through EF Core migrations
 
 From the repository root:
 
-    cd BoardGameLibrary
-    dotnet restore
-    dotnet run --project BoardGameLibrary.Api
+```
+cd BoardGameLibrary
 
-For manual EF Core schema management, the committed migrations can also be applied explicitly:
+dotnet restore
 
-    dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+dotnet run --project BoardGameLibrary.Api
+```
+
+For manual EF Core schema management, run the commands from the `BoardGameLibrary` solution directory:
+
+```
+dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+```
 
 The repository contains the current migration history. Do not create a new migration just to run the project. If you have a local `boardgamelibrary.db` created by an older version of the project, delete that file once before starting so the current migrations can rebuild the schema cleanly.
 
@@ -60,11 +74,11 @@ The Development root serves Swagger UI at `http://localhost:5006/`. The launch s
 
 The project intentionally keeps the HTTP surface to GET and POST, as required by the assignment.
 
-| Method | Route | Purpose |
-|---|---|---|
-| GET | `/api/games` | Browse the library. |
-| GET | `/api/games/{id}` | Retrieve one game. |
-| POST | `/api/games` | Add a game with optional player-count ratings. |
+| Method | Route             | Purpose                                        |
+| ------ | ----------------- | ---------------------------------------------- |
+| GET    | `/api/games`      | Browse the library.                            |
+| GET    | `/api/games/{id}` | Retrieve one game.                             |
+| POST   | `/api/games`      | Add a game with optional player-count ratings. |
 
 ### GET discovery parameters
 
@@ -74,41 +88,48 @@ The project intentionally keeps the HTTP surface to GET and POST, as required by
 
 `sort` accepts:
 
-- `title` — alphabetical order; this is the default.
-- `rating` — highest rating for the selected `players` value first.
-- `playtime` — shortest maximum play time first.
+* `title` — alphabetical order; this is the default.
+* `rating` — highest rating for the selected `players` value first.
+* `playtime` — shortest maximum play time first.
 
 `sort=rating` requires `players`, because the rating is specific to a player count.
 
 A representative request is:
 
-    GET /api/games?players=4&maxMinutes=90&sort=rating
+```
+GET /api/games?players=4&maxMinutes=90&sort=rating
+```
 
 The response includes `selectedPlayerCount` and `selectedPlayerRating` so the reason a game ranked where it did is visible directly in the API response.
 
 ### GET one game with a selected player count
 
-    GET /api/games/1?players=3
+```
+GET /api/games/1?players=3
+```
 
 The response includes the stored player-count ratings and identifies the selected three-player rating. If `players` is outside the game's supported range, the API returns `400 Bad Request`.
 
 ### POST example
 
-    POST /api/games
-    Content-Type: application/json
+```
+POST /api/games
 
-    {
-      "title": "Example Game",
-      "minPlayers": 2,
-      "maxPlayers": 4,
-      "minPlayTimeMinutes": 45,
-      "maxPlayTimeMinutes": 90,
-      "playerRatings": [
-        { "playerCount": 2, "rating": 7.5 },
-        { "playerCount": 3, "rating": 8.5 },
-        { "playerCount": 4, "rating": 8.0 }
-      ]
-    }
+Content-Type: application/json
+
+{
+  "title": "Example Game",
+  "minPlayers": 2,
+  "maxPlayers": 4,
+  "minPlayTimeMinutes": 45,
+  "maxPlayTimeMinutes": 90,
+  "playerRatings": [
+    { "playerCount": 2, "rating": 7.5 },
+    { "playerCount": 3, "rating": 8.5 },
+    { "playerCount": 4, "rating": 8.0 }
+  ]
+}
+```
 
 Successful creation returns `201 Created`, the created resource, and a `Location` header pointing to the new resource.
 
@@ -132,8 +153,13 @@ Local development uses SQLite with EF Core migrations. The Development startup a
 
 Schema changes should still be made through normal EF Core migration workflow:
 
-    dotnet ef migrations add <MigrationName> --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
-    dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+```
+dotnet ef migrations add <MigrationName> --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+
+dotnet ef database update --project BoardGameLibrary.Api --startup-project BoardGameLibrary.Api
+```
+
+Run these commands from the `BoardGameLibrary` solution directory.
 
 Tests use a separate SQLite in-memory connection, so they never depend on the developer's local database.
 
@@ -141,11 +167,15 @@ Tests use a separate SQLite in-memory connection, so they never depend on the de
 
 Run the complete automated API suite from the solution directory:
 
-    dotnet test
+```
+dotnet test
+```
 
 Build the solution:
 
-    dotnet build
+```
+dotnet build
+```
 
 The tests exercise the real Controller → Service → EF Core pipeline and cover creation, retrieval, player-count discovery, player-count-specific ratings, play-time filtering, sorting, validation, seed idempotency, and database failure handling.
 
@@ -153,32 +183,44 @@ Manual verification can be performed through Swagger UI, the `.http` file, cURL,
 
 ## Project structure
 
-    BoardGameLibrary/
-    ├── BoardGameLibrary.Api/
-    │   ├── Controllers/
-    │   ├── Data/
-    │   ├── Model/
-    │   ├── SeedData/
-    │   ├── Services/
-    │   └── Migrations/
-    ├── BoardGameLibrary.Tests/
-    ├── Planning/
-    └── README.md
+```
+BoardGameLibrary/
+
+├── BoardGameLibrary.Api/
+
+│   ├── Controllers/
+
+│   ├── Data/
+
+│   ├── Model/
+
+│   ├── SeedData/
+
+│   ├── Services/
+
+│   └── Migrations/
+
+├── BoardGameLibrary.Tests/
+
+├── Planning/
+
+└── README.md
+```
 
 ## Verification checklist
 
 Before delivery:
 
-- `dotnet test` passes.
-- `dotnet build` passes.
-- The current EF Core migration chain applies to an empty database.
-- Swagger can be opened from the Development root.
-- GET collection, GET by ID, POST, filtering, sorting, and validation have been manually exercised.
-- The Development seed produces the demonstration library without replacing existing data.
-- The README matches the actual project.
+* `dotnet test` passes.
+* `dotnet build` passes.
+* The current EF Core migration chain applies to an empty database.
+* Swagger can be opened from the Development root.
+* GET collection, GET by ID, POST, filtering, sorting, and validation have been manually exercised.
+* The Development seed produces the demonstration library without replacing existing data.
+* The README matches the actual project.
 
 ## Development workspace
 
-- `Planning/Planning.md` — project direction, requirements, scope, decisions, behaviour contracts, and current design.
-- `Planning/TestPlan.md` — verification strategy and automated/manual test design.
-- Concrete test files — executable API behaviour.
+* `Planning/Planning.md` — project direction, requirements, scope, decisions, behaviour contracts, and current design.
+* `Planning/TestPlan.md` — verification strategy and automated/manual test design.
+* Concrete test files — executable API behaviour.
