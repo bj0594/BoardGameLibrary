@@ -16,8 +16,10 @@ When `players=4` is selected, for example, the response exposes the four-player 
 
 ## Quick demo
 
-1. Start the API from the solution directory:
+1. From the repository root, enter the solution directory and start the API:
 
+       cd BoardGameLibrary
+       dotnet restore
        dotnet run --project BoardGameLibrary.Api
 
 2. Open Swagger UI:
@@ -40,8 +42,9 @@ Requirements:
 - No external service, API account, or API key at runtime
 - SQLite database managed through EF Core migrations
 
-From the `BoardGameLibrary` solution directory:
+From the repository root:
 
+    cd BoardGameLibrary
     dotnet restore
     dotnet run --project BoardGameLibrary.Api
 
@@ -51,7 +54,7 @@ For manual EF Core schema management, the committed migrations can also be appli
 
 The repository contains the current migration history. Do not create a new migration just to run the project. If you have a local `boardgamelibrary.db` created by an older version of the project, delete that file once before starting so the current migrations can rebuild the schema cleanly.
 
-The Development root opens Swagger UI at `http://localhost:5006/`. The launch settings also support HTTPS on the configured HTTPS port.
+The Development root serves Swagger UI at `http://localhost:5006/`. The launch settings also support HTTPS on the configured HTTPS port.
 
 ## API surface
 

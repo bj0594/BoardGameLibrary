@@ -20,7 +20,7 @@ public class BoardGamesController(
     /// <param name="cancellationToken">Request cancellation token.</param>
     /// <response code="200">Returns matching board games.</response>
     /// <response code="400">The query parameters are invalid or rating sorting is missing players.</response>
-    /// <response code="500">A database operation failed.</response>
+    /// <response code="500">An unexpected server error occurred while retrieving the library.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<BoardGame>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -80,7 +80,7 @@ public class BoardGamesController(
             logger.LogError(exception, "Database operation failed while retrieving the board-game library.");
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
-                title: "Database operation failed.");
+                title: "Unexpected server error.");
         }
     }
 
@@ -91,7 +91,7 @@ public class BoardGamesController(
     /// <response code="200">Returns the requested board game.</response>
     /// <response code="400">The route ID, player count, or selected player count is invalid for the requested game.</response>
     /// <response code="404">No board game exists with the requested ID.</response>
-    /// <response code="500">A database operation failed.</response>
+    /// <response code="500">An unexpected server error occurred while retrieving the requested game.</response>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(BoardGame), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -137,7 +137,7 @@ public class BoardGamesController(
             logger.LogError(exception, "Database operation failed while retrieving board game {BoardGameId}.", id);
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
-                title: "Database operation failed.");
+                title: "Unexpected server error.");
         }
     }
 
@@ -146,7 +146,7 @@ public class BoardGamesController(
     /// <param name="cancellationToken">Request cancellation token.</param>
     /// <response code="201">Returns the created game and a Location header for the new resource.</response>
     /// <response code="400">The request body or its values are invalid.</response>
-    /// <response code="500">The board game could not be persisted.</response>
+    /// <response code="500">An unexpected server error occurred while creating the game.</response>
     [HttpPost]
     [ProducesResponseType(typeof(BoardGame), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -177,13 +177,13 @@ public class BoardGamesController(
             logger.LogError(exception, "Board game could not be persisted.");
             return Problem(
                 statusCode: StatusCodes.Status500InternalServerError,
-                title: "Board game could not be persisted.");
+                title: "Unexpected server error.");
         }
     }
 
     private static bool IsSupportedSort(string? sort) =>
         string.IsNullOrWhiteSpace(sort) ||
-        sort.Trim().Equals("title", StringComparison.OrdinalIgnoreCase) ||
-        sort.Trim().Equals("rating", StringComparison.OrdinalIgnoreCase) ||
-        sort.Trim().Equals("playtime", StringComparison.OrdinalIgnoreCase);
+        string.Equals(sort, "title", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(sort, "rating", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(sort, "playtime", StringComparison.OrdinalIgnoreCase);
 }

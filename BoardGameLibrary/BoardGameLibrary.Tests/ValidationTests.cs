@@ -26,6 +26,8 @@ public class ValidationTests
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Title", body, StringComparison.OrdinalIgnoreCase);
 

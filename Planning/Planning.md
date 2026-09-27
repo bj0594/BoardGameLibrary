@@ -132,7 +132,7 @@ Owns routing, API-boundary validation, status codes, and HTTP responses.
 Owns query/filter/sort behaviour, application rules, mapping of selected player-count ratings, and async EF Core access.
 
 ### Persistence
-EF Core + SQLite. Production/local schema is managed through EF Core migrations. Tests use isolated in-memory SQLite.
+EF Core + SQLite. The local database schema is managed through EF Core migrations. Tests use isolated in-memory SQLite.
 
 ### Seed data
 A Development-only seeder provides an immediate portfolio/demo dataset. BGG snapshot metadata is static; the application has no live BGG dependency.
@@ -157,9 +157,9 @@ Before delivery:
 - [x] `dotnet build` is green.
 - [x] Latest committed EF Core migration has been generated and applied.
 - [x] Development startup successfully applies pending migrations before seeding.
-- [x] Swagger opens from the Development root.
+- [x] Swagger is served from the Development root.
 - [x] GET discovery scenarios have been manually verified.
 - [x] POST and validation have been manually verified.
 - [x] Async/non-blocking path has been inspected.
 - [x] README matches the actual project.
-- [ ] GitHub/Canvas delivery is complete.
+- [x] GitHub/Canvas delivery is complete.

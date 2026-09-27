@@ -64,6 +64,7 @@ The goal is sufficient behavioural coverage, not maximum test count.
 ### Failure handling
 - GET database failure returns `500`.
 - POST database failure returns `500`.
+- Representative `400`/`404`/`500` responses use `ProblemDetails`.
 
 ## 3. Integration level
 

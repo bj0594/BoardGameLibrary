@@ -123,6 +123,10 @@ public class GetBoardGamesTests
         var response = await client.GetAsync("/api/games/99999");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Board game not found", body, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<int> SeedAsync(BoardGameApiFactory factory, BoardGame game)

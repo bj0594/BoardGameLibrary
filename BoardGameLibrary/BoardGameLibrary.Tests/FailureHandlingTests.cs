@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 
 namespace BoardGameLibrary.Tests;
 
+public sealed record ProblemDetailsPayload(string? Type, string? Title, int? Status, string? Detail, string? Instance);
+
 /// <summary>
 /// Confirms that infrastructure failures become safe HTTP 500 responses.
 /// </summary>
@@ -19,6 +21,12 @@ public class FailureHandlingTests
         var response = await client.GetAsync("/api/games");
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsPayload>();
+
+        Assert.NotNull(problem);
+        Assert.Equal("Unexpected server error.", problem!.Title);
     }
 
     [Fact]
